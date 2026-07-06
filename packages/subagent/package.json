@@ -1,7 +1,7 @@
 {
   "name": "pi-oh-my-subagent",
   "version": "0.1.0",
-  "description": "Lightweight parallel subagent extension for Pi coding agent",
+  "description": "Subagent + background tasks (spawn_bg, check_spawn, bash_bg, check_bg) for Pi coding agent",
   "type": "module",
   "pi": {
     "extensions": ["./index.ts"]

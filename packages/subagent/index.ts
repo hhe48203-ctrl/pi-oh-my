@@ -1,19 +1,34 @@
 /**
- * pi-oh-my-subagent: Lightweight parallel subagent extension.
+ * pi-oh-my-subagent: Subagent + background task tools for Pi.
  *
- * Spawns a child `pi -p --no-session` process for each subagent call.
- * - executionMode: "parallel" → Pi runs multiple subagent calls concurrently
- * - Child gets isolated session, fresh context, restricted tools
- * - --exclude-tools subagent prevents recursion
- * - Abort signal kills the child process
+ * Tools:
+ * - subagent:    Blocking parallel subagent (waits for result)
+ * - spawn_bg:    Non-blocking subagent (returns task_id immediately)
+ * - check_spawn: Check spawn_bg task status and output
+ * - bash_bg:     Non-blocking bash command (returns task_id immediately)
+ * - check_bg:    Check bash_bg task status and output
+ *
+ * Background tasks run in detached processes — they don't block the agent loop.
+ * The LLM polls with check_bg / check_spawn to get results.
  */
 
 import { spawn } from "node:child_process";
 import { Type } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { DEFAULT_TIMEOUT_MS, DEFAULT_TOOLS, EXCLUDED_CHILD_TOOLS, KILL_GRACE_MS, SUBAGENT_PROMPT } from "./constants.ts";
+import { registerBackgroundTools } from "./background.ts";
+import {
+  DEFAULT_TIMEOUT_MS,
+  DEFAULT_TOOLS,
+  EXCLUDED_CHILD_TOOLS,
+  KILL_GRACE_MS,
+  SUBAGENT_PROMPT,
+} from "./constants.ts";
+
+// ─── Extension ───────────────────────────────────────────────
 
 export default function (pi: ExtensionAPI) {
+  // ── 1. subagent (blocking, parallel) ──────────────────────
+
   pi.registerTool({
     name: "subagent",
     label: "Subagent",
@@ -32,6 +47,7 @@ export default function (pi: ExtensionAPI) {
       "Each subagent prompt must be fully self-contained (no shared context).",
       "Multiple `subagent` calls in one turn execute in parallel.",
       `Subagents are read-only by default (${DEFAULT_TOOLS}); add bash,edit,write for write access.`,
+      "For non-blocking subagents, use `spawn_bg` + `check_spawn` instead.",
     ],
     execute: async (_id, params, signal, _onUpdate, ctx) => {
       const { prompt, tools, model, timeoutMs } = params;
@@ -89,4 +105,6 @@ export default function (pi: ExtensionAPI) {
       }
     },
   });
+
+  registerBackgroundTools(pi);
 }

@@ -18,6 +18,7 @@ A collection of enhancements for the [Pi coding agent](https://pi.dev), inspired
 
 - **🤖 Subagent** — Parallel subagent delegation. The LLM calls `subagent({ prompt, description, tools? })` to spawn an isolated child Pi process with its own session and context. Multiple calls in one turn run in parallel automatically (`executionMode: "parallel"`). Read-only by default; add `bash,edit,write` for write access. No recursion (child can't spawn grandchildren).
 
+- **🔄 Background Tasks** — Non-blocking `bash_bg` and `spawn_bg` tools that start a process and return immediately with a `task_id`. The agent loop is NOT blocked — the LLM can continue working and poll results later with `check_bg` / `check_spawn`. Best for long-running commands (test suites, builds, dev servers) and long-running subagents (deep review, exploration).
 
 ## Installation
 
@@ -105,6 +106,26 @@ subagent({
 
 Multiple `subagent` calls in one turn run in parallel. Each gets an isolated process with fresh context.
 
+**Background Tasks** — For long-running work that shouldn't block the agent loop:
+
+```
+# Start a background bash command
+bash_bg({ command: "npm test", label: "run tests" })
+→ "Background task started. Task ID: a1b2c3d4"
+
+# Start a background subagent
+spawn_bg({ prompt: "Deep review of src/auth/...", description: "review auth" })
+→ "Background subagent started. Task ID: e5f6g7h8"
+
+# The agent can now do other work (read files, edit code, etc.)
+# Later, poll for results:
+check_bg({ task_id: "a1b2c3d4" })
+→ "Status: running, Elapsed: 12.3s, --- output --- ..."
+check_spawn({ task_id: "e5f6g7h8" })
+→ "Status: completed, --- output --- ..."
+```
+
+Background tasks run in detached processes with their own timeout (default 10 min). Output is buffered (last 100KB); checks return the last 10KB. Tasks are killed on session shutdown.
 
 ## Uninstall
 
