@@ -1,0 +1,20 @@
+{
+  "name": "pi-oh-my",
+  "version": "0.1.0",
+  "description": "Hashline edits, directory rules injection, and /init-deep for Pi coding agent",
+  "type": "module",
+  "pi": {
+    "extensions": ["./index.ts"]
+  },
+  "dependencies": {},
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-ai": "*",
+    "typebox": "*"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-coding-agent": { "optional": false },
+    "@earendil-works/pi-ai": { "optional": false },
+    "typebox": { "optional": false }
+  }
+}
