@@ -1,0 +1,9 @@
+{
+  "name": "pi-oh-my-hashline",
+  "version": "0.1.0",
+  "description": "Hash-anchored edits for Pi coding agent — zero stale-line errors",
+  "type": "module",
+  "pi": {
+    "extensions": ["./index.ts"]
+  }
+}

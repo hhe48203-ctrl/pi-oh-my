@@ -33,58 +33,33 @@ interface DirEntry {
 
 function walkTree(root: string, maxDepth: number): DirEntry[] {
 	const results: DirEntry[] = [];
-
 	function walk(dir: string, depth: number) {
 		if (depth > maxDepth) return;
-
 		let entries: import("node:fs").Dirent[];
 		try {
-			entries = readdirSync(dir, { withFileTypes: true }).sort((a, b) =>
-				a.name.localeCompare(b.name),
-			);
-		} catch {
-			return;
-		}
-
+			entries = readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name));
+		} catch { return; }
 		const sourceFiles: string[] = [];
 		const subdirs: string[] = [];
-
 		for (const entry of entries) {
 			if (entry.isDirectory()) {
-				if (!EXCLUDE_DIRS.has(entry.name)) {
-					subdirs.push(entry.name);
-				}
+				if (!EXCLUDE_DIRS.has(entry.name)) subdirs.push(entry.name);
 			} else if (entry.isFile()) {
 				const ext = entry.name.slice(entry.name.lastIndexOf("."));
-				if (SOURCE_EXTENSIONS.has(ext)) {
-					sourceFiles.push(entry.name);
-				}
+				if (SOURCE_EXTENSIONS.has(ext)) sourceFiles.push(entry.name);
 			}
 		}
-
 		if (sourceFiles.length > 0) {
-			results.push({
-				path: dir,
-				relativePath: relative(root, dir) || ".",
-				depth,
-				sourceFiles: sourceFiles.slice(0, MAX_FILES_PER_DIR),
-				subdirs,
-			});
+			results.push({ path: dir, relativePath: relative(root, dir) || ".", depth, sourceFiles: sourceFiles.slice(0, MAX_FILES_PER_DIR), subdirs });
 		}
-
-		for (const sub of subdirs) {
-			walk(join(dir, sub), depth + 1);
-		}
+		for (const sub of subdirs) walk(join(dir, sub), depth + 1);
 	}
-
 	walk(root, 0);
 	return results;
 }
 
 function gatherContext(dir: string, sourceFiles: string[]): string {
 	const parts: string[] = [];
-
-	// package.json
 	const pkgPath = join(dir, "package.json");
 	if (existsSync(pkgPath)) {
 		try {
@@ -96,12 +71,7 @@ function gatherContext(dir: string, sourceFiles: string[]): string {
 			if (pkg.scripts) parts.push(`  scripts: ${Object.keys(pkg.scripts).slice(0, 10).join(", ")}`);
 		} catch {}
 	}
-
-	// Key file previews
-	const keyFiles = sourceFiles
-		.filter(f => /^(index|main|mod|lib|app|server|client|handler|router|config)\./i.test(f))
-		.slice(0, 3);
-
+	const keyFiles = sourceFiles.filter(f => /^(index|main|mod|lib|app|server|client|handler|router|config)\./i.test(f)).slice(0, 3);
 	for (const file of keyFiles) {
 		try {
 			const content = readFileSync(join(dir, file), "utf-8");
@@ -110,7 +80,6 @@ function gatherContext(dir: string, sourceFiles: string[]): string {
 			parts.push(`\n--- ${file} (first ${MAX_FILE_PREVIEW_LINES} lines) ---\n${preview}`);
 		} catch {}
 	}
-
 	return parts.join("\n");
 }
 
@@ -134,145 +103,59 @@ Write an AGENTS.md file in markdown with these sections (keep under 40 lines tot
 Output ONLY the AGENTS.md content, no explanations or code fences.`;
 }
 
-async function callLlm(
-	ctx: ExtensionCommandContext,
-	prompt: string,
-): Promise<string | null> {
+async function callLlm(ctx: ExtensionCommandContext, prompt: string): Promise<string | null> {
 	const model = ctx.model;
 	if (!model) return null;
-
 	let apiKey: string | undefined;
 	let headers: Record<string, string> | undefined;
 	try {
 		const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-		if (auth.ok && auth.apiKey) {
-			apiKey = auth.apiKey;
-			headers = auth.headers;
-		}
+		if (auth.ok && auth.apiKey) { apiKey = auth.apiKey; headers = auth.headers; }
 	} catch {}
 	if (!apiKey) return null;
-
 	try {
 		const { complete } = await import("@earendil-works/pi-ai/compat");
-		const response = await complete(
-			model,
-			{
-				messages: [
-					{
-						role: "user" as const,
-						content: [{ type: "text" as const, text: prompt }],
-						timestamp: Date.now(),
-					},
-				],
-			},
-			{ apiKey, headers, signal: ctx.signal },
-		);
-
+		const response = await complete(model, { messages: [{ role: "user" as const, content: [{ type: "text" as const, text: prompt }], timestamp: Date.now() }] }, { apiKey, headers, signal: ctx.signal });
 		const parts = Array.isArray(response.content) ? response.content : [];
-		return parts
-			.map((p) => {
-				const part = p as Record<string, unknown>;
-				return typeof part.text === "string" ? part.text : "";
-			})
-			.join("")
-			.trim();
-	} catch {
-		return null;
-	}
+		return parts.map((p) => { const part = p as Record<string, unknown>; return typeof part.text === "string" ? part.text : ""; }).join("").trim();
+	} catch { return null; }
 }
 
 function generateTemplate(dir: DirEntry, context: string): string {
 	const dirName = dir.relativePath === "." ? "Project Root" : dir.relativePath;
 	const fileList = dir.sourceFiles.map(f => `- \`${f}\``).join("\n");
-
 	let deps = "";
 	const pkgMatch = context.match(/dependencies:\s*(.+)/);
-	if (pkgMatch) {
-		deps = `\n\n## Dependencies\n${pkgMatch[1]}`;
-	}
-
-	return `# ${dirName}
-
-## Purpose
-TODO: Describe the purpose of this directory.
-
-## Key Files
-${fileList}
-
-## Conventions
-TODO: Document any conventions used in this directory.${deps}
-`;
+	if (pkgMatch) deps = `\n\n## Dependencies\n${pkgMatch[1]}`;
+	return `# ${dirName}\n\n## Purpose\nTODO: Describe the purpose of this directory.\n\n## Key Files\n${fileList}\n\n## Conventions\nTODO: Document any conventions used in this directory.${deps}\n`;
 }
 
-export function registerInitDeepCommand(pi: ExtensionAPI): void {
+export default function (pi: ExtensionAPI) {
 	pi.registerCommand("init-deep", {
 		description: "Auto-generate hierarchical AGENTS.md files throughout your project",
 		handler: async (args, ctx: ExtensionCommandContext) => {
 			const root = ctx.cwd;
-
-			// Parse args for depth
 			const depthArg = args.match(/--depth[=\s]+(\d+)/);
 			const maxDepth = depthArg ? parseInt(depthArg[1]!, 10) : MAX_DEPTH;
-
-			if (!ctx.hasUI) {
-				return;
-			}
-
-			const ok = await ctx.ui.confirm(
-				"Generate AGENTS.md files?",
-				`Walk ${root} (depth ${maxDepth}) and generate AGENTS.md in each source directory. Existing files will be skipped.`,
-			);
+			if (!ctx.hasUI) return;
+			const ok = await ctx.ui.confirm("Generate AGENTS.md files?", `Walk ${root} (depth ${maxDepth}) and generate AGENTS.md in each source directory. Existing files will be skipped.`);
 			if (!ok) return;
-
 			ctx.ui.setStatus("init-deep", "Scanning project...");
 			const dirs = walkTree(root, maxDepth);
-
-			if (dirs.length === 0) {
-				ctx.ui.notify("No source directories found.", "info");
-				ctx.ui.setStatus("init-deep", undefined);
-				return;
-			}
-
-			let generated = 0;
-			let skipped = 0;
-			let failed = 0;
-
+			if (dirs.length === 0) { ctx.ui.notify("No source directories found.", "info"); ctx.ui.setStatus("init-deep", undefined); return; }
+			let generated = 0, skipped = 0, failed = 0;
 			for (const dir of dirs) {
 				const agentsMdPath = join(dir.path, "AGENTS.md");
-
-				// Skip if AGENTS.md already exists
-				if (existsSync(agentsMdPath)) {
-					skipped++;
-					continue;
-				}
-
-				ctx.ui.setStatus(
-					"init-deep",
-					`Generating ${dir.relativePath}/AGENTS.md (${generated + skipped + failed + 1}/${dirs.length})...`,
-				);
-
+				if (existsSync(agentsMdPath)) { skipped++; continue; }
+				ctx.ui.setStatus("init-deep", `Generating ${dir.relativePath}/AGENTS.md (${generated + skipped + failed + 1}/${dirs.length})...`);
 				const context = gatherContext(dir.path, dir.sourceFiles);
 				const prompt = buildPrompt(dir, context);
-
-				// Try LLM first, fall back to template
 				let content = await callLlm(ctx, prompt);
-				if (!content) {
-					content = generateTemplate(dir, context);
-				}
-
-				try {
-					writeFileSync(agentsMdPath, content + "\n", "utf-8");
-					generated++;
-				} catch {
-					failed++;
-				}
+				if (!content) content = generateTemplate(dir, context);
+				try { writeFileSync(agentsMdPath, content + "\n", "utf-8"); generated++; } catch { failed++; }
 			}
-
 			ctx.ui.setStatus("init-deep", undefined);
-			ctx.ui.notify(
-				`Done: ${generated} generated, ${skipped} skipped, ${failed} failed.`,
-				generated > 0 ? "info" : "warning",
-			);
+			ctx.ui.notify(`Done: ${generated} generated, ${skipped} skipped, ${failed} failed.`, generated > 0 ? "info" : "warning");
 		},
 	});
 }

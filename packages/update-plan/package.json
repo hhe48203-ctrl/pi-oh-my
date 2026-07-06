@@ -1,0 +1,9 @@
+{
+  "name": "pi-oh-my-update-plan",
+  "version": "0.1.0",
+  "description": "Structured task checklist tool (update_plan) for Pi coding agent",
+  "type": "module",
+  "pi": {
+    "extensions": ["./index.ts"]
+  }
+}

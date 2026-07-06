@@ -1,0 +1,9 @@
+{
+  "name": "pi-oh-my-goal-mode",
+  "version": "0.1.0",
+  "description": "Persistent goal tracking with auto-continue for Pi coding agent",
+  "type": "module",
+  "pi": {
+    "extensions": ["./index.ts"]
+  }
+}

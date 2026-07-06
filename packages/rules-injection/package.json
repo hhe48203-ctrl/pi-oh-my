@@ -1,0 +1,9 @@
+{
+  "name": "pi-oh-my-rules-injection",
+  "version": "0.1.0",
+  "description": "Directory-level AGENTS.md injection for Pi coding agent",
+  "type": "module",
+  "pi": {
+    "extensions": ["./index.ts"]
+  }
+}

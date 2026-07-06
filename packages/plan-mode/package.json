@@ -1,0 +1,9 @@
+{
+  "name": "pi-oh-my-plan-mode",
+  "version": "0.1.0",
+  "description": "Read-only Plan Mode for Pi coding agent — explore, plan, then execute",
+  "type": "module",
+  "pi": {
+    "extensions": ["./index.ts"]
+  }
+}

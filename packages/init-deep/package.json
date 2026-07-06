@@ -1,0 +1,9 @@
+{
+  "name": "pi-oh-my-init-deep",
+  "version": "0.1.0",
+  "description": "Hierarchical AGENTS.md generator for Pi coding agent",
+  "type": "module",
+  "pi": {
+    "extensions": ["./index.ts"]
+  }
+}

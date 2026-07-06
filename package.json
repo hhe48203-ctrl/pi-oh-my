@@ -1,7 +1,7 @@
 {
   "name": "pi-oh-my",
   "version": "0.1.0",
-  "description": "Hashline edits, directory rules injection, and /init-deep for Pi coding agent",
+  "description": "Enhancements for Pi coding agent — hashline, rules, /init-deep, update_plan, plan mode, goal mode",
   "type": "module",
   "pi": {
     "extensions": ["./index.ts"]
