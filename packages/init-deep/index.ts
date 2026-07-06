@@ -23,7 +23,7 @@ const MAX_FILES_PER_DIR = 20;
 const MAX_FILE_PREVIEW_LINES = 15;
 const MAX_FILE_PREVIEW_CHARS = 500;
 
-interface DirEntry {
+export interface DirEntry {
 	path: string;
 	relativePath: string;
 	depth: number;
@@ -31,7 +31,7 @@ interface DirEntry {
 	subdirs: string[];
 }
 
-function walkTree(root: string, maxDepth: number): DirEntry[] {
+export function walkTree(root: string, maxDepth: number): DirEntry[] {
 	const results: DirEntry[] = [];
 	function walk(dir: string, depth: number) {
 		if (depth > maxDepth) return;
@@ -121,7 +121,7 @@ async function callLlm(ctx: ExtensionCommandContext, prompt: string): Promise<st
 	} catch { return null; }
 }
 
-function generateTemplate(dir: DirEntry, context: string): string {
+export function generateTemplate(dir: DirEntry, context: string): string {
 	const dirName = dir.relativePath === "." ? "Project Root" : dir.relativePath;
 	const fileList = dir.sourceFiles.map(f => `- \`${f}\``).join("\n");
 	let deps = "";

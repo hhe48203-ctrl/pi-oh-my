@@ -6,7 +6,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 const AGENTS_FILENAMES = ["AGENTS.md", "AGENTS.MD", "CLAUDE.md", "CLAUDE.MD"];
 const MAX_AGENTS_MD_CHARS = 8000;
 
-function findDirectoryAgentsMd(dir: string): string | null {
+export function findDirectoryAgentsMd(dir: string): string | null {
 	for (const filename of AGENTS_FILENAMES) {
 		const filePath = join(dir, filename);
 		if (existsSync(filePath)) return filePath;
@@ -14,7 +14,7 @@ function findDirectoryAgentsMd(dir: string): string | null {
 	return null;
 }
 
-async function formatAgentsMdBlock(agentsMdPath: string): Promise<string | null> {
+export async function formatAgentsMdBlock(agentsMdPath: string): Promise<string | null> {
 	try {
 		const content = await readFile(agentsMdPath, "utf-8");
 		const truncated =

@@ -6,7 +6,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 // ─── Hash ────────────────────────────────────────────────────────────
 
-function lineHash(line: string): string {
+export function lineHash(line: string): string {
 	const buf = createHash("sha256").update(line).digest();
 	const num = (buf[0]! * 65536 + buf[1]! * 256 + buf[2]!) % 46656;
 	return num.toString(36).padStart(3, "0").toUpperCase();
@@ -14,12 +14,12 @@ function lineHash(line: string): string {
 
 // ─── Anchor ──────────────────────────────────────────────────────────
 
-interface Anchor {
+export interface Anchor {
 	line: number;
 	hash: string;
 }
 
-function parseAnchor(anchor: string): Anchor {
+export function parseAnchor(anchor: string): Anchor {
 	const m = anchor.match(/^(\d+)#([0-9A-Z]+)$/);
 	if (!m) {
 		throw new Error(
@@ -33,7 +33,7 @@ function parseAnchor(anchor: string): Anchor {
 
 const NOTICE_RE = /\n\n\[(Showing lines |\d+ more lines in file|Line \d+ is )/;
 
-function enhanceWithHashes(text: string, startLine: number): string {
+export function enhanceWithHashes(text: string, startLine: number): string {
 	let content = text;
 	let notice = "";
 	const m = text.match(NOTICE_RE);

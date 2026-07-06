@@ -9,7 +9,7 @@ const MAX_STORED_OUTPUT = 100_000;
 const MAX_CHECK_OUTPUT = 10_000;
 const MAX_BG_TASKS = 4;
 
-interface BgTask {
+export interface BgTask {
   id: string;
   kind: "bash" | "subagent";
   label: string;
@@ -27,16 +27,16 @@ interface BgTask {
 
 const bgTasks = new Map<string, BgTask>();
 
-function isTaskFinished(task: BgTask): boolean {
+export function isTaskFinished(task: BgTask): boolean {
   return task.finishedAt !== null;
 }
 
-function appendOutput(buf: string, chunk: string): string {
+export function appendOutput(buf: string, chunk: string): string {
   const s = buf + chunk;
   return s.length > MAX_STORED_OUTPUT ? s.slice(-MAX_STORED_OUTPUT) : s;
 }
 
-function activeTaskCount(): number {
+export function activeTaskCount(): number {
   let count = 0;
   for (const task of bgTasks.values()) {
     if (!isTaskFinished(task)) count += 1;
@@ -125,7 +125,7 @@ function spawnBgTask(
   return id;
 }
 
-function formatTaskStatus(task: BgTask): string {
+export function formatTaskStatus(task: BgTask): string {
   const now = Date.now();
   const elapsed = ((task.finishedAt ?? now) - task.startedAt) / 1000;
   let status: string;
