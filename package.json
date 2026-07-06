@@ -9,8 +9,8 @@
     ]
   },
   "scripts": {
-    "test": "vitest --run",
-    "test:watch": "vitest"
+    "test": "bun run vitest --run",
+    "test:watch": "bun run vitest"
   },
   "devDependencies": {
     "vitest": "^3.0.0"

@@ -7,3 +7,4 @@ coverage/
 .codegraph/
 *.log
 package-lock.json
+pnpm-lock.yaml
