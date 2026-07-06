@@ -1,0 +1,9 @@
+{
+  "name": "pi-oh-my-subagent",
+  "version": "0.1.0",
+  "description": "Lightweight parallel subagent extension for Pi coding agent",
+  "type": "module",
+  "pi": {
+    "extensions": ["./index.ts"]
+  }
+}

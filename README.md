@@ -16,6 +16,9 @@ A collection of enhancements for the [Pi coding agent](https://pi.dev), inspired
 
 - **🎯 Goal Mode** — Persistent objective tracking with auto-continue. `/goal <objective>` sets a durable goal; the agent automatically continues turn after turn until the goal is complete, blocked, or the turn budget is exhausted. The model gets `get_goal`/`update_goal` tools (can only mark complete/blocked). Requires update-plan.
 
+- **🤖 Subagent** — Parallel subagent delegation. The LLM calls `subagent({ prompt, description, tools? })` to spawn an isolated child Pi process with its own session and context. Multiple calls in one turn run in parallel automatically (`executionMode: "parallel"`). Read-only by default; add `bash,edit,write` for write access. No recursion (child can't spawn grandchildren).
+
+
 ## Installation
 
 ### All three (full bundle)
@@ -33,6 +36,7 @@ pi install ~/Desktop/pi-oh-my/packages/init-deep           # only /init-deep
 pi install ~/Desktop/pi-oh-my/packages/update-plan          # only update_plan tool
 pi install ~/Desktop/pi-oh-my/packages/plan-mode           # only plan mode (needs update-plan)
 pi install ~/Desktop/pi-oh-my/packages/goal-mode            # only goal mode (needs update-plan)
+pi install ~/Desktop/pi-oh-my/packages/subagent             # only subagent
 ```
 
 Restart Pi or run `/reload`.
@@ -82,6 +86,25 @@ hashline_edit({
 /goal resume         # resume auto-continue
 /goal clear          # remove the goal
 ```
+
+**Subagent** — The agent calls `subagent` automatically when it identifies parallel, independent tasks. You can also hint:
+
+```
+Review src/auth/ and src/api/ in parallel using subagents
+```
+
+The tool call looks like:
+
+```
+subagent({
+  prompt: "Review src/auth/login.ts for security issues...",
+  description: "review auth module",
+  tools: "read,grep,find,ls"        // optional, read-only by default
+})
+```
+
+Multiple `subagent` calls in one turn run in parallel. Each gets an isolated process with fresh context.
+
 
 ## Uninstall
 

@@ -5,6 +5,7 @@ import initDeep from "./packages/init-deep/index.ts";
 import updatePlan from "./packages/update-plan/index.ts";
 import planMode from "./packages/plan-mode/index.ts";
 import goalMode from "./packages/goal-mode/index.ts";
+import subagent from "./packages/subagent/index.ts";
 
 export default function (pi: ExtensionAPI) {
 	hashline(pi);
@@ -13,4 +14,5 @@ export default function (pi: ExtensionAPI) {
 	updatePlan(pi);
 	planMode(pi);
 	goalMode(pi);
+	subagent(pi);
 }
