@@ -18,6 +18,8 @@ A collection of enhancements for the [Pi coding agent](https://pi.dev), inspired
 
 - **🤖 Subagent** — Parallel subagent delegation. The LLM calls `subagent({ prompt, description, tools? })` to spawn an isolated child Pi process with its own session and context. Multiple calls in one turn run in parallel automatically (`executionMode: "parallel"`). Read-only by default; add `bash,edit,write` for write access. No recursion (child can't spawn grandchildren).
 
+- **🧪 Async Subagent** — Experimental `subagent_async` uses an in-process async Pi session instead of a child `pi` process. It keeps a fresh in-memory context but shares the parent Node runtime, useful for measuring spawn overhead.
+
 - **🔄 Background Tasks** — Non-blocking `bash_bg` and `spawn_bg` tools that start a process and return immediately with a `task_id`. The agent loop is NOT blocked — the LLM can continue working and poll results later with `check_bg` / `check_spawn`. Best for long-running commands (test suites, builds, dev servers) and long-running subagents (deep review, exploration).
 
 ## Installation
@@ -105,6 +107,22 @@ subagent({
 ```
 
 Multiple `subagent` calls in one turn run in parallel. Each gets an isolated process with fresh context.
+
+**Async Subagent** — Same shape, but runs through the Pi SDK in the current Node process:
+
+```
+subagent_async({
+  prompt: "Review src/auth/login.ts for security issues...",
+  description: "review auth module",
+  tools: "read,grep,find,ls"
+})
+```
+
+Benchmark against process-spawned subagents:
+
+```bash
+bun run bench:subagents --iterations=1 --prompt="Reply exactly: OK"
+```
 
 **Background Tasks** — For long-running work that shouldn't block the agent loop:
 

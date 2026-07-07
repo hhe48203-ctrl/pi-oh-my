@@ -15,6 +15,7 @@
 import { spawn } from "node:child_process";
 import { Type } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { registerAsyncSubagentTool } from "./async-subagent.ts";
 import { registerBackgroundTools } from "./background.ts";
 import {
   DEFAULT_TIMEOUT_MS,
@@ -106,5 +107,6 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
+  registerAsyncSubagentTool(pi);
   registerBackgroundTools(pi);
 }

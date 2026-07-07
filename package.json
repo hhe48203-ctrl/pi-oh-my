@@ -10,7 +10,8 @@
   },
   "scripts": {
     "test": "bun run vitest --run",
-    "test:watch": "bun run vitest"
+    "test:watch": "bun run vitest",
+    "bench:subagents": "bun run scripts/bench-subagents.ts"
   },
   "devDependencies": {
     "vitest": "^3.0.0"
