@@ -18,3 +18,4 @@ export const MAX_BG_TASKS = 4;
 export const MAX_PANEL_TASKS = 6;
 export const MAX_PANEL_LABEL = 44;
 export const PANEL_REFRESH_MS = 1_000;
+export const MAX_ERROR_STDERR = 1_500;

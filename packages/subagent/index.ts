@@ -23,8 +23,20 @@ import {
   DEFAULT_TOOLS,
   EXCLUDED_CHILD_TOOLS,
   KILL_GRACE_MS,
+  MAX_ERROR_STDERR,
   SUBAGENT_PROMPT,
 } from "./constants.ts";
+
+export function stderrTail(stderr: string, maxChars = MAX_ERROR_STDERR): string {
+  const trimmed = stderr.trim();
+  if (!trimmed) return "";
+  return trimmed.length > maxChars ? `...${trimmed.slice(-maxChars)}` : trimmed;
+}
+
+export function appendStderr(message: string, stderr: string, maxChars = MAX_ERROR_STDERR): string {
+  const tail = stderrTail(stderr, maxChars);
+  return tail ? `${message}\n\n--- subagent stderr ---\n${tail}` : message;
+}
 
 export const SUBAGENT_ACTIVE_TOOLS = [
   "subagent",
@@ -81,8 +93,8 @@ export default function (pi: ExtensionAPI) {
     renderCall(args, theme) {
       return renderToolCall(theme, "subagent", args.description);
     },
-    renderResult(result, options, theme) {
-      return renderToolResult(theme, result, { expanded: options.expanded });
+    renderResult(result, options, theme, context) {
+      return renderToolResult(theme, result, { expanded: options.expanded || context?.isError === true });
     },
     execute: async (_id, params, signal, _onUpdate, ctx) => {
       const { prompt, tools, model, timeoutMs } = params;
@@ -123,11 +135,11 @@ export default function (pi: ExtensionAPI) {
           return { content: [{ type: "text" as const, text: `Subagent failed to start: ${r.error.message}${hint}` }], isError: true };
         }
         if (r.sig) {
-          if (timedOut) return { content: [{ type: "text" as const, text: `Subagent timed out after ${timeout}ms and was killed.` }], isError: true };
-          return { content: [{ type: "text" as const, text: "Subagent aborted." }], isError: true };
+          if (timedOut) return { content: [{ type: "text" as const, text: appendStderr(`Subagent timed out after ${timeout}ms and was killed.`, err) }], isError: true };
+          return { content: [{ type: "text" as const, text: appendStderr("Subagent aborted.", err) }], isError: true };
         }
         if (r.code !== 0 && !out.trim()) {
-          return { content: [{ type: "text" as const, text: `Subagent failed (exit ${r.code}).\n${err.trim()}` }], isError: true };
+          return { content: [{ type: "text" as const, text: appendStderr(`Subagent failed (exit ${r.code}).`, err) }], isError: true };
         }
         return { content: [{ type: "text" as const, text: out.trim() || "Subagent produced no output." }] };
       } catch (e) {
