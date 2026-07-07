@@ -145,6 +145,8 @@ check_spawn({ task_id: "e5f6g7h8" })
 
 Background tasks run in detached processes with their own timeout (default 10 min). Output is buffered (last 100KB); checks return the last 10KB. Tasks are killed on session shutdown.
 
+Subagent/background thresholds are centralized in `packages/subagent/constants.ts` (timeout, output caps, panel limits, refresh interval, bash label preview length), so tuning behavior does not require hunting for hardcoded values across files.
+
 ## Uninstall
 
 ```bash

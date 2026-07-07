@@ -2,14 +2,17 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-import { DEFAULT_TIMEOUT_MS, KILL_GRACE_MS } from "./constants.ts";
+import {
+  DEFAULT_TIMEOUT_MS,
+  KILL_GRACE_MS,
+  MAX_BG_TASKS,
+  MAX_CHECK_OUTPUT,
+  MAX_PANEL_LABEL,
+  MAX_PANEL_TASKS,
+  MAX_STORED_OUTPUT,
+  PANEL_REFRESH_MS,
+} from "./constants.ts";
 
-const MAX_STORED_OUTPUT = 100_000;
-const MAX_CHECK_OUTPUT = 10_000;
-const MAX_BG_TASKS = 4;
-const MAX_PANEL_TASKS = 6;
-const MAX_PANEL_LABEL = 44;
-const PANEL_REFRESH_MS = 1_000;
 const BG_WIDGET_KEY = "bg-tasks";
 
 export interface BgTask {

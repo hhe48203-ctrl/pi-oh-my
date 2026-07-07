@@ -2,7 +2,13 @@ import { Type } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 import { renderToolCall, renderToolResult } from "../tool-render.ts";
-import { DEFAULT_TIMEOUT_MS, DEFAULT_TOOLS, EXCLUDED_CHILD_TOOLS, SUBAGENT_PROMPT } from "./constants.ts";
+import {
+  DEFAULT_BASH_LABEL_PREVIEW_CHARS,
+  DEFAULT_TIMEOUT_MS,
+  DEFAULT_TOOLS,
+  EXCLUDED_CHILD_TOOLS,
+  SUBAGENT_PROMPT,
+} from "./constants.ts";
 import { checkTask, rememberBackgroundContext, shutdownBackgroundTasks, spawnBgTask } from "./background-runtime.ts";
 
 export {
@@ -91,7 +97,7 @@ export function registerBackgroundTools(pi: ExtensionAPI): void {
     executionMode: "parallel",
     parameters: Type.Object({
       command: Type.String({ description: "Bash command to execute in the background" }),
-      label: Type.Optional(Type.String({ description: "Short description for the task. Defaults to first 40 chars of command." })),
+      label: Type.Optional(Type.String({ description: `Short description for the task. Defaults to first ${DEFAULT_BASH_LABEL_PREVIEW_CHARS} chars of command.` })),
       timeoutMs: Type.Optional(Type.Number({ description: `Max runtime in ms. Default: ${DEFAULT_TIMEOUT_MS}.` })),
     }),
     renderCall(args, theme) {
@@ -103,7 +109,7 @@ export function registerBackgroundTools(pi: ExtensionAPI): void {
     execute: async (_id, params, _signal, _onUpdate, ctx) => {
       rememberBackgroundContext(ctx);
       const { command, label, timeoutMs } = params;
-      const taskLabel = label || command.slice(0, 40);
+      const taskLabel = label || command.slice(0, DEFAULT_BASH_LABEL_PREVIEW_CHARS);
       const timeout = typeof timeoutMs === "number" && timeoutMs > 0 ? timeoutMs : DEFAULT_TIMEOUT_MS;
       try {
         const id = spawnBgTask("bash", taskLabel, "bash", ["-c", command], ctx.cwd, timeout);
