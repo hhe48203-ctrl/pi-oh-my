@@ -9,6 +9,7 @@ const MAX_CHECK_OUTPUT = 10_000;
 const MAX_BG_TASKS = 4;
 const MAX_PANEL_TASKS = 6;
 const MAX_PANEL_LABEL = 44;
+const PANEL_REFRESH_MS = 1_000;
 const BG_WIDGET_KEY = "bg-tasks";
 
 export interface BgTask {
@@ -40,6 +41,7 @@ export interface BgTaskSnapshot {
 
 const bgTasks = new Map<string, BgTask>();
 let widgetContext: ExtensionContext | undefined;
+let panelRefreshTimer: ReturnType<typeof setInterval> | undefined;
 
 export function isTaskFinished(task: BgTask): boolean {
   return task.finishedAt !== null;
@@ -80,7 +82,8 @@ function taskStatus(task: BgTaskSnapshot): string {
 }
 
 function elapsedSeconds(task: BgTaskSnapshot, now: number): string {
-  return `${(((task.finishedAt ?? now) - task.startedAt) / 1000).toFixed(1)}s`;
+  const elapsed = Math.max(0, Math.floor(((task.finishedAt ?? now) - task.startedAt) / 1000));
+  return `${elapsed}s`;
 }
 
 function panelLabel(label: string): string {
@@ -102,10 +105,26 @@ export function formatTaskPanelLines(tasks: readonly BgTaskSnapshot[], now = Dat
   return lines;
 }
 
+function updatePanelRefreshTimer(): void {
+  if (!widgetContext || activeTaskCount() === 0) {
+    if (panelRefreshTimer) {
+      clearInterval(panelRefreshTimer);
+      panelRefreshTimer = undefined;
+    }
+    return;
+  }
+  if (!panelRefreshTimer) {
+    panelRefreshTimer = setInterval(() => {
+      refreshBackgroundWidget();
+    }, PANEL_REFRESH_MS);
+  }
+}
+
 function refreshBackgroundWidget(): void {
   if (!widgetContext) return;
   const lines = formatTaskPanelLines([...bgTasks.values()].map(snapshotTask));
   widgetContext.ui.setWidget(BG_WIDGET_KEY, lines.length > 0 ? lines : undefined, { placement: "belowEditor" });
+  updatePanelRefreshTimer();
 }
 
 export function rememberBackgroundContext(ctx: ExtensionContext): void {
@@ -199,15 +218,15 @@ export function spawnBgTask(
 
 export function formatTaskStatus(task: BgTask): string {
   const now = Date.now();
-  const elapsed = ((task.finishedAt ?? now) - task.startedAt) / 1000;
+  const elapsed = Math.max(0, Math.floor(((task.finishedAt ?? now) - task.startedAt) / 1000));
   const status = taskStatus(snapshotTask(task));
   const lines = [
-    `${task.kind} ${task.id}: ${status} after ${elapsed.toFixed(1)}s - ${task.label}`,
+    `${task.kind} ${task.id}: ${status} after ${elapsed}s - ${task.label}`,
     "",
     `Task: ${task.label}`,
     `Kind: ${task.kind}`,
     `Status: ${status}`,
-    `Elapsed: ${elapsed.toFixed(1)}s`,
+    `Elapsed: ${elapsed}s`,
   ];
   const out = task.stdout.trim();
   if (out) lines.push("", "--- output ---", out.length > MAX_CHECK_OUTPUT ? `...${out.slice(-MAX_CHECK_OUTPUT)}` : out);
@@ -231,6 +250,10 @@ export function shutdownBackgroundTasks(ctx: ExtensionContext): void {
     if (task.timeoutTimer) clearTimeout(task.timeoutTimer);
   }
   bgTasks.clear();
+  if (panelRefreshTimer) {
+    clearInterval(panelRefreshTimer);
+    panelRefreshTimer = undefined;
+  }
   widgetContext = ctx;
   refreshBackgroundWidget();
 }

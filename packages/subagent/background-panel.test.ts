@@ -26,7 +26,7 @@ describe("formatTaskPanelLines", () => {
 		expect(lines[1]).toContain("running");
 		expect(lines[1]).toContain("abc12345");
 		expect(lines[1]).toContain("bash");
-		expect(lines[1]).toContain("5.5s");
+		expect(lines[1]).toContain("5s");
 		expect(lines[1]).toContain("bun test");
 	});
 
@@ -34,7 +34,7 @@ describe("formatTaskPanelLines", () => {
 		const lines = formatTaskPanelLines([task({ finishedAt: 3_000, exitCode: 0 })], now);
 
 		expect(lines[1]).toContain("completed");
-		expect(lines[1]).toContain("2.0s");
+		expect(lines[1]).toContain("2s");
 	});
 
 	it("returns no lines when there are no tasks", () => {
