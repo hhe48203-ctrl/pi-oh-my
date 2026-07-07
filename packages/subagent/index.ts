@@ -26,6 +26,33 @@ import {
   SUBAGENT_PROMPT,
 } from "./constants.ts";
 
+export const SUBAGENT_ACTIVE_TOOLS = [
+  "subagent",
+  "subagent_async",
+  "spawn_bg",
+  "check_spawn",
+  "bash_bg",
+  "check_bg",
+] as const;
+
+interface ActiveToolsApi {
+  getActiveTools(): string[];
+  setActiveTools(toolNames: string[]): void;
+  on(event: "session_start", handler: () => void): void;
+}
+
+export function activateSubagentTools(pi: Pick<ActiveToolsApi, "getActiveTools" | "setActiveTools">): void {
+  const current = pi.getActiveTools();
+  const toAdd = SUBAGENT_ACTIVE_TOOLS.filter((name) => !current.includes(name));
+  if (toAdd.length > 0) {
+    pi.setActiveTools([...current, ...toAdd]);
+  }
+}
+
+export function registerSubagentToolActivation(pi: ActiveToolsApi): void {
+  pi.on("session_start", () => activateSubagentTools(pi));
+}
+
 // ─── Extension ───────────────────────────────────────────────
 
 export default function (pi: ExtensionAPI) {
@@ -116,4 +143,5 @@ export default function (pi: ExtensionAPI) {
 
   registerAsyncSubagentTool(pi);
   registerBackgroundTools(pi);
+  registerSubagentToolActivation(pi);
 }

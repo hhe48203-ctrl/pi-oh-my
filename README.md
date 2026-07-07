@@ -1,6 +1,6 @@
 # pi-oh-my
 
-A collection of enhancements for the [Pi coding agent](https://pi.dev), inspired by [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent) and [oh-my-pi](https://github.com/can1357/oh-my-pi).
+A collection of enhancements for the [Pi coding agent](https://pi.dev), inspired by [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent).
 
 ## Features
 
