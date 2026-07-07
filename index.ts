@@ -6,8 +6,10 @@ import updatePlan from "./packages/update-plan/index.ts";
 import planMode from "./packages/plan-mode/index.ts";
 import goalMode from "./packages/goal-mode/index.ts";
 import subagent from "./packages/subagent/index.ts";
+import { registerBuiltInToolCards } from "./packages/builtin-tools/index.ts";
 
 export default function (pi: ExtensionAPI) {
+	registerBuiltInToolCards(pi);
 	hashline(pi);
 	rulesInjection(pi);
 	initDeep(pi);
