@@ -93,7 +93,7 @@ export default function (pi: ExtensionAPI) {
       if (model) args.push("--model", model);
       args.push(prompt);
 
-      const child = spawn("pi", args, { cwd: ctx.cwd, stdio: ["pipe", "pipe", "pipe"] });
+      const child = spawn("pi", args, { cwd: ctx.cwd, stdio: ["ignore", "pipe", "pipe"] });
 
       let timedOut = false;
       let childClosed = false;
