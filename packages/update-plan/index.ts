@@ -16,6 +16,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { Text } from "@earendil-works/pi-tui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { renderToolCall } from "../tool-render.ts";
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -105,6 +106,9 @@ export default function updatePlanExtension(pi: ExtensionAPI): void {
 			"If the plan changes, include an explanation",
 		],
 		parameters: UpdatePlanParams,
+		renderCall(args, theme) {
+			return renderToolCall(theme, "update_plan", `${args.plan.length} step${args.plan.length === 1 ? "" : "s"}`);
+		},
 
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
 			// Validate: at most one in_progress

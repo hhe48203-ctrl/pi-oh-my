@@ -14,34 +14,9 @@
  * Requires: pi-oh-my-update-plan installed (for step tracking).
  */
 
-import { StringEnum } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { Type } from "typebox";
-
-// ── Types ──────────────────────────────────────────────────────────
-
-type GoalStatus = "active" | "paused" | "blocked" | "complete";
-
-interface GoalState {
-	objective: string;
-	status: GoalStatus;
-	turnsUsed: number;
-	maxTurns: number;
-	tokensUsed: number;
-	createdAt: number;
-}
-
-// ── Schema ─────────────────────────────────────────────────────────
-
-const UpdateGoalParams = Type.Object(
-	{
-		status: StringEnum(["complete", "blocked"] as const),
-		reason: Type.Optional(Type.String()),
-	},
-	{ additionalProperties: false },
-);
-
-const GetGoalParams = Type.Object({}, { additionalProperties: false });
+import { registerGoalTools } from "./tools.ts";
+import type { GoalState, GoalUpdateStatus } from "./state.ts";
 
 // ── Defaults ───────────────────────────────────────────────────────
 
@@ -80,74 +55,17 @@ export default function goalModeExtension(pi: ExtensionAPI): void {
 	});
 	pi.on("session_tree", (_e, ctx) => reconstruct(ctx));
 
-	// ── get_goal tool ─────────────────────────────────────────────
-	pi.registerTool({
-		name: "get_goal",
-		label: "Goal",
-		description:
-			"Read the current active goal, its status, and remaining turn budget. " +
-			"Use this to remind yourself of the objective and how many turns you have left.",
-		parameters: GetGoalParams,
-
-		async execute(_id, _params, _signal, _onUpdate, _ctx) {
-			if (!goal) {
-				return {
-					content: [{ type: "text" as const, text: "No active goal." }],
-					details: null as unknown,
-				};
-			}
-			const remaining = goal.maxTurns - goal.turnsUsed;
-			const text =
-				`Goal: ${goal.objective}\n` +
-				`Status: ${goal.status}\n` +
-				`Turns: ${goal.turnsUsed}/${goal.maxTurns} (${remaining} remaining)\n` +
-				`Tokens: ~${goal.tokensUsed}`;
-			return {
-				content: [{ type: "text" as const, text }],
-				details: goal,
-			};
-		},
-	});
-
-	// ── update_goal tool (model can only complete/block) ─────────
-	pi.registerTool({
-		name: "update_goal",
-		label: "Update Goal",
-		description:
-			"Mark the active goal as complete or blocked. " +
-			"Use 'complete' ONLY when you have verified the objective is met " +
-			"(tests pass, files exist, etc). " +
-			"Use 'blocked' when you cannot proceed and need user help. " +
-			"You CANNOT pause, resume, or clear — those are user-controlled.",
-		promptSnippet: "update_goal: mark the goal complete or blocked",
-		promptGuidelines: [
-			"Call update_goal(complete) when the objective is verifiably met",
-			"Call update_goal(blocked) when you cannot proceed",
-		],
-		parameters: UpdateGoalParams,
-
-		async execute(_id, params, _signal, _onUpdate, ctx) {
-			if (!goal) {
-				return {
-					content: [{ type: "text" as const, text: "No active goal." }],
-					details: null as unknown,
-				};
-			}
-
-			goal.status = params.status;
+	registerGoalTools(pi, {
+		getGoal: () => goal,
+		updateGoal: (status: GoalUpdateStatus, reason: string | undefined, ctx: ExtensionContext) => {
+			if (!goal) return null;
+			goal.status = status;
 			persist();
 			refreshStatus(ctx);
-
-			const msg = params.reason
-				? `Goal marked ${params.status}: ${params.reason}`
-				: `Goal marked ${params.status}.`;
-
-			ctx.ui.notify(msg, params.status === "complete" ? "info" : "warning");
-
-			return {
-				content: [{ type: "text" as const, text: msg }],
-				details: goal,
-			};
+			const message = reason
+				? `Goal marked ${status}: ${reason}`
+				: `Goal marked ${status}.`;
+			return { message, goal };
 		},
 	});
 

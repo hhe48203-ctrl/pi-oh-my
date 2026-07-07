@@ -15,6 +15,7 @@
 import { spawn } from "node:child_process";
 import { Type } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { renderToolCall, renderToolResult } from "../tool-render.ts";
 import { registerAsyncSubagentTool } from "./async-subagent.ts";
 import { registerBackgroundTools } from "./background.ts";
 import {
@@ -50,6 +51,12 @@ export default function (pi: ExtensionAPI) {
       `Subagents are read-only by default (${DEFAULT_TOOLS}); add bash,edit,write for write access.`,
       "For non-blocking subagents, use `spawn_bg` + `check_spawn` instead.",
     ],
+    renderCall(args, theme) {
+      return renderToolCall(theme, "subagent", args.description);
+    },
+    renderResult(result, options, theme) {
+      return renderToolResult(theme, result, { expanded: options.expanded });
+    },
     execute: async (_id, params, signal, _onUpdate, ctx) => {
       const { prompt, tools, model, timeoutMs } = params;
       const allow = tools || DEFAULT_TOOLS;

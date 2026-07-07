@@ -3,12 +3,13 @@ import { resolve, dirname } from "node:path";
 import { readFile, writeFile } from "node:fs/promises";
 import { Type } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { renderToolCall, renderToolResult } from "../tool-render.ts";
 
 // ─── Hash ────────────────────────────────────────────────────────────
 
 export function lineHash(line: string): string {
 	const buf = createHash("sha256").update(line).digest();
-	const num = (buf[0]! * 65536 + buf[1]! * 256 + buf[2]!) % 46656;
+	const num = ((buf[0] ?? 0) * 65536 + (buf[1] ?? 0) * 256 + (buf[2] ?? 0)) % 46656;
 	return num.toString(36).padStart(3, "0").toUpperCase();
 }
 
@@ -26,7 +27,14 @@ export function parseAnchor(anchor: string): Anchor {
 			`Invalid anchor "${anchor}". Expected format: lineNum#HASH (e.g., "11#ABC")`,
 		);
 	}
-	return { line: parseInt(m[1]!, 10), hash: m[2]! };
+	const linePart = m[1];
+	const hash = m[2];
+	if (!linePart || !hash) {
+		throw new Error(
+			`Invalid anchor "${anchor}". Expected format: lineNum#HASH (e.g., "11#ABC")`,
+		);
+	}
+	return { line: parseInt(linePart, 10), hash };
 }
 
 // ─── Read enhancer ───────────────────────────────────────────────────
@@ -96,6 +104,12 @@ function registerHashlineEditTool(pi: ExtensionAPI): void {
 				},
 			),
 		}),
+		renderCall(args, theme) {
+			return renderToolCall(theme, "hashline_edit", `${args.path} (${args.edits.length} edit${args.edits.length === 1 ? "" : "s"})`);
+		},
+		renderResult(result, options, theme) {
+			return renderToolResult(theme, result, { expanded: options.expanded });
+		},
 
 		async execute(_toolCallId, params: HashlineEditInput, _signal, _onUpdate, ctx) {
 			const absolutePath = resolve(ctx.cwd, params.path);
@@ -148,8 +162,8 @@ function registerHashlineEditTool(pi: ExtensionAPI): void {
 					};
 				}
 
-				const startLineContent = lines[edit.start.line - 1]!;
-				const endLineContent = lines[edit.end.line - 1]!;
+				const startLineContent = lines[edit.start.line - 1] ?? "";
+				const endLineContent = lines[edit.end.line - 1] ?? "";
 				const startActualHash = lineHash(startLineContent);
 				const endActualHash = lineHash(endLineContent);
 

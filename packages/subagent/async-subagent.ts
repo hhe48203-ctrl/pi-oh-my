@@ -7,6 +7,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 
+import { renderToolCall, renderToolResult } from "../tool-render.ts";
 import {
   DEFAULT_TIMEOUT_MS,
   DEFAULT_TOOLS,
@@ -126,6 +127,12 @@ export function registerAsyncSubagentTool(pi: ExtensionAPI): void {
       "Use `subagent_async` to test in-process subagent overhead against process-spawned `subagent`.",
       "Prompts must be self-contained; the child session does not inherit conversation history.",
     ],
+    renderCall(args, theme) {
+      return renderToolCall(theme, "subagent_async", args.description);
+    },
+    renderResult(result, options, theme) {
+      return renderToolResult(theme, result, { expanded: options.expanded });
+    },
     execute: async (_id, params, _signal, _onUpdate, ctx) => {
       try {
         const result = await runInProcessSubagent({
