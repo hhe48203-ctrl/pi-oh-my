@@ -22,20 +22,31 @@ export {
 
 export function registerBackgroundTools(pi: ExtensionAPI): void {
   pi.registerTool({
-    name: "spawn_bg",
-    label: "Spawn Background Subagent",
+    name: "background_delegate",
+    label: "Background Delegate",
     description:
-      "Spawn a subagent in the background — returns immediately with a task_id. The subagent runs in an isolated process with its own session. Does NOT block the agent loop — you can continue working and check the result later with `check_spawn`. Best for long-running tasks (code review, test suites, deep exploration) that don't need immediate results.",
+      "Delegate a task to a background agent — returns immediately with a task_id. " +
+      "The agent runs in its own process and does NOT block. " +
+      "Use for long-running work (code review, deep exploration, test analysis) " +
+      "that doesn't need immediate results. " +
+      "Check the result later with `check_delegate`.",
+    promptSnippet: "background_delegate: delegate a non-blocking task to a background agent (check later with check_delegate)",
+    promptGuidelines: [
+      "Use `background_delegate` for long-running tasks where you can continue working while it runs.",
+      "Use `subagent` instead when you need the result before proceeding (blocking).",
+      "Use `bash_bg` for plain shell commands that don't need agent reasoning.",
+      "Always call `check_delegate` to retrieve the result — don't forget about delegated tasks.",
+    ],
     executionMode: "parallel",
     parameters: Type.Object({
-      prompt: Type.String({ description: "Complete task for the subagent. Must be self-contained." }),
-      description: Type.String({ description: "Short 3-8 word description, e.g. 'review auth module'" }),
+      prompt: Type.String({ description: "Complete, self-contained task description. The agent has zero context beyond this." }),
+      description: Type.String({ description: "Short 3-8 word label, e.g. 'review auth module'" }),
       tools: Type.Optional(Type.String({ description: `Comma-separated tool allowlist. Default: ${DEFAULT_TOOLS} (read-only).` })),
       model: Type.Optional(Type.String({ description: "Model pattern for the subagent." })),
       timeoutMs: Type.Optional(Type.Number({ description: `Max runtime in ms. Default: ${DEFAULT_TIMEOUT_MS}.` })),
     }),
     renderCall(args, theme) {
-      return renderToolCall(theme, "spawn_bg", args.description);
+      return renderToolCall(theme, "background_delegate", args.description);
     },
     renderResult(result, options, theme) {
       return renderToolResult(theme, result, { expanded: options.expanded });
@@ -53,7 +64,7 @@ export function registerBackgroundTools(pi: ExtensionAPI): void {
         return {
           content: [{
             type: "text" as const,
-            text: `Background subagent started: ${id}\nDescription: ${params.description}\nCheck with: check_spawn task_id=${id}`,
+            text: `Background delegate started: ${id}\nDescription: ${params.description}\nCheck with: check_delegate task_id=${id}`,
           }],
           details: { taskId: id, kind: "subagent", label: params.description },
         };
@@ -65,16 +76,19 @@ export function registerBackgroundTools(pi: ExtensionAPI): void {
   });
 
   pi.registerTool({
-    name: "check_spawn",
-    label: "Check Background Subagent",
+    name: "check_delegate",
+    label: "Check Delegate",
     description:
-      "Check the status and output of a background subagent started with `spawn_bg`. Returns current status (running/completed/failed/timed out), elapsed time, and output so far. If still running, do other work and check again later.",
+      "Check the status and output of a background delegate started with `background_delegate`. " +
+      "Returns status (running/completed/failed/timed out), elapsed time, and output so far. " +
+      "If still running, do other work and check again later.",
+    promptSnippet: "check_delegate: check status of a background_delegate task",
     executionMode: "parallel",
     parameters: Type.Object({
-      task_id: Type.String({ description: "Task ID returned by spawn_bg" }),
+      task_id: Type.String({ description: "Task ID returned by background_delegate" }),
     }),
     renderCall(args, theme) {
-      return renderToolCall(theme, "check_spawn", `task_id=${args.task_id}`);
+      return renderToolCall(theme, "check_delegate", `task_id=${args.task_id}`);
     },
     renderResult(result, options, theme) {
       return renderToolResult(theme, result, { expanded: options.expanded });
@@ -83,7 +97,7 @@ export function registerBackgroundTools(pi: ExtensionAPI): void {
       rememberBackgroundContext(ctx);
       const text = checkTask(params.task_id, "subagent");
       if (text === null) {
-        return { content: [{ type: "text" as const, text: `Task ${params.task_id} not found or not a subagent task.` }], isError: true };
+        return { content: [{ type: "text" as const, text: `Task ${params.task_id} not found or not a delegate task.` }], isError: true };
       }
       return { content: [{ type: "text" as const, text }] };
     },
@@ -93,7 +107,16 @@ export function registerBackgroundTools(pi: ExtensionAPI): void {
     name: "bash_bg",
     label: "Background Bash",
     description:
-      "Execute a bash command in the background — returns immediately with a task_id. Does NOT block the agent loop. Best for long-running commands (test suites, builds, dev servers, file watches). Check the result later with `check_bg`. For quick commands, use the regular `bash` tool instead.",
+      "Run a bash command in the background — returns immediately with a task_id. " +
+      "Use for long-running commands (test suites, builds, dev servers, file watches). " +
+      "Check the result later with `check_bg`. " +
+      "For quick commands, use the regular `bash` tool instead.",
+    promptSnippet: "bash_bg: run a long-running bash command in the background (check with check_bg)",
+    promptGuidelines: [
+      "Use `bash_bg` for commands that take more than a few seconds (tests, builds, servers).",
+      "Use regular `bash` for quick commands — don't background everything.",
+      "Always follow up with `check_bg` to get the result.",
+    ],
     executionMode: "parallel",
     parameters: Type.Object({
       command: Type.String({ description: "Bash command to execute in the background" }),
@@ -131,7 +154,10 @@ export function registerBackgroundTools(pi: ExtensionAPI): void {
     name: "check_bg",
     label: "Check Background Bash",
     description:
-      "Check the status and output of a background bash command started with `bash_bg`. Returns current status (running/completed/failed/timed out), elapsed time, and output so far. If still running, do other work and check again later.",
+      "Check the status and output of a background bash command started with `bash_bg`. " +
+      "Returns status (running/completed/failed/timed out), elapsed time, and output so far. " +
+      "If still running, do other work and check again later.",
+    promptSnippet: "check_bg: check status of a bash_bg background task",
     executionMode: "parallel",
     parameters: Type.Object({
       task_id: Type.String({ description: "Task ID returned by bash_bg" }),

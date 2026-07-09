@@ -17,7 +17,7 @@ describe("activateSubagentTools", () => {
   });
 
   it("does not duplicate already active subagent tools", () => {
-    let activeTools = ["read", "subagent", "spawn_bg"];
+    let activeTools = ["read", "subagent", "background_delegate"];
 
     activateSubagentTools({
       getActiveTools: () => activeTools,
@@ -26,7 +26,7 @@ describe("activateSubagentTools", () => {
       },
     });
 
-    expect(activeTools).toEqual(["read", "subagent", "spawn_bg", "subagent_async", "check_spawn", "bash_bg", "check_bg"]);
+    expect(activeTools).toEqual(["read", "subagent", "background_delegate", "subagent_async", "check_delegate", "bash_bg", "check_bg"]);
   });
 });
 

@@ -2,14 +2,14 @@
  * pi-oh-my-subagent: Subagent + background task tools for Pi.
  *
  * Tools:
- * - subagent:    Blocking parallel subagent (waits for result)
- * - spawn_bg:    Non-blocking subagent (returns task_id immediately)
- * - check_spawn: Check spawn_bg task status and output
- * - bash_bg:     Non-blocking bash command (returns task_id immediately)
- * - check_bg:    Check bash_bg task status and output
+ * - subagent:             Blocking parallel delegate (waits for result)
+ * - background_delegate:  Non-blocking delegate (returns task_id immediately)
+ * - check_delegate:       Check background_delegate task status and output
+ * - bash_bg:              Non-blocking bash command (returns task_id immediately)
+ * - check_bg:             Check bash_bg task status and output
  *
  * Background tasks run in detached processes — they don't block the agent loop.
- * The LLM polls with check_bg / check_spawn to get results.
+ * The LLM polls with check_delegate / check_bg to get results.
  */
 
 import { spawn } from "node:child_process";
@@ -41,8 +41,8 @@ export function appendStderr(message: string, stderr: string, maxChars = MAX_ERR
 export const SUBAGENT_ACTIVE_TOOLS = [
   "subagent",
   "subagent_async",
-  "spawn_bg",
-  "check_spawn",
+  "background_delegate",
+  "check_delegate",
   "bash_bg",
   "check_bg",
 ] as const;
@@ -72,23 +72,24 @@ export default function (pi: ExtensionAPI) {
 
   pi.registerTool({
     name: "subagent",
-    label: "Subagent",
+    label: "Delegate",
     description:
-      "Spawn a parallel subagent in an isolated process. The subagent gets its own session, context, and tools — it does NOT inherit your conversation history. Best for parallel independent tasks (code review, exploration, multi-perspective analysis). Returns the subagent's final text response. Blocks until the subagent completes.",
+      "Delegate a task to a parallel agent with its own context. Use when you need to review code, explore a codebase, or do any work that benefits from isolation from the current conversation. The subagent does NOT see your chat history — give it everything it needs in the prompt. Blocks until done, then returns the result.",
+    promptSnippet: "subagent: delegate an isolated task to a parallel agent (blocks until done)",
     executionMode: "parallel",
     parameters: Type.Object({
-      prompt: Type.String({ description: "Complete task for the subagent. Must be self-contained — the subagent has zero context beyond this prompt." }),
-      description: Type.String({ description: "Short 3-8 word description, e.g. 'review auth module'" }),
+      prompt: Type.String({ description: "Complete, self-contained task description. The subagent has zero context beyond this." }),
+      description: Type.String({ description: "Short 3-8 word label, e.g. 'review auth module'" }),
       tools: Type.Optional(Type.String({ description: `Comma-separated tool allowlist. Default: ${DEFAULT_TOOLS} (read-only). Add bash,edit,write for write access.` })),
-      model: Type.Optional(Type.String({ description: "Model pattern for the subagent, e.g. 'claude-sonnet-4'. Defaults to current model." })),
-      timeoutMs: Type.Optional(Type.Number({ description: `Maximum runtime in ms before killing the subagent. Default: ${DEFAULT_TIMEOUT_MS}.` })),
+      model: Type.Optional(Type.String({ description: "Model pattern, e.g. 'claude-sonnet-4'. Defaults to current model." })),
+      timeoutMs: Type.Optional(Type.Number({ description: `Max runtime in ms. Default: ${DEFAULT_TIMEOUT_MS}.` })),
     }),
     promptGuidelines: [
-      "Use `subagent` for parallel, independent tasks — not sequential work.",
-      "Each subagent prompt must be fully self-contained (no shared context).",
-      "Multiple `subagent` calls in one turn execute in parallel.",
+      "Use `subagent` to delegate independent work (code review, exploration, analysis) that doesn't need your conversation history.",
+      "Multiple `subagent` calls in one turn run in parallel — use this for multi-perspective or divide-and-conquer tasks.",
+      "Each subagent prompt must be fully self-contained — the subagent has no context beyond what you write.",
       `Subagents are read-only by default (${DEFAULT_TOOLS}); add bash,edit,write for write access.`,
-      "For non-blocking subagents, use `spawn_bg` + `check_spawn` instead.",
+      "For non-blocking delegation (continue working while it runs), use `background_delegate` + `check_delegate` instead.",
     ],
     renderCall(args, theme) {
       return renderToolCall(theme, "subagent", args.description);

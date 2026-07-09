@@ -93,17 +93,16 @@ export default function updatePlanExtension(pi: ExtensionAPI): void {
 		name: "update_plan",
 		label: "Plan",
 		description:
-			"Update the task plan (checklist). Use for non-trivial multi-step work. " +
-			"Pass the FULL plan each call (it replaces the previous). " +
-			"Keep exactly one step in_progress until all are completed. " +
-			"Good steps are outcome-oriented and verifiable " +
-			"(e.g. 'Parse Markdown via CommonMark'). " +
-			"Don't pad simple single-step tasks with plan steps.",
-		promptSnippet: "update_plan: track a multi-step task checklist (pending/in_progress/completed)",
+			"Track progress on multi-step tasks (3+ steps). " +
+			"Call this BEFORE starting work to lay out steps, then update as you complete each step. " +
+			"Replace the full plan each call. Keep exactly one step in_progress; mark completed steps done. " +
+			"Skip for simple single-step tasks.",
+		promptSnippet: "update_plan: lay out and track multi-step task checklists (call before starting work on 3+ step tasks)",
 		promptGuidelines: [
-			"Call update_plan for non-trivial multi-step work; skip it for simple single-step tasks",
-			"Keep exactly one step in_progress; mark completed steps completed before moving on",
-			"If the plan changes, include an explanation",
+			"Call update_plan before starting non-trivial multi-step work to lay out the steps.",
+			"Update the plan after completing each step — mark it completed and move the next to in_progress.",
+			"Keep exactly one step in_progress at a time.",
+			"Skip update_plan for simple single-step tasks.",
 		],
 		parameters: UpdatePlanParams,
 		renderCall(args, theme) {
