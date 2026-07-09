@@ -1,0 +1,9 @@
+{
+  "name": "pi-oh-my-log-analyze",
+  "version": "0.1.0",
+  "description": "SQLite-backed session log analysis for Pi coding agent",
+  "type": "module",
+  "pi": {
+    "extensions": ["./index.ts"]
+  }
+}

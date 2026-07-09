@@ -6,6 +6,7 @@ import updatePlan from "./packages/update-plan/index.ts";
 import planMode from "./packages/plan-mode/index.ts";
 import goalMode from "./packages/goal-mode/index.ts";
 import subagent from "./packages/subagent/index.ts";
+import logAnalyze from "./packages/log-analyze/index.ts";
 import { registerBuiltInToolCards } from "./packages/builtin-tools/index.ts";
 
 export default function (pi: ExtensionAPI) {
@@ -17,4 +18,5 @@ export default function (pi: ExtensionAPI) {
 	planMode(pi);
 	goalMode(pi);
 	subagent(pi);
+	logAnalyze(pi);
 }
