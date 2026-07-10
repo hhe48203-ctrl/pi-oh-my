@@ -16,10 +16,12 @@ import { Key } from "@earendil-works/pi-tui";
 
 // ── Tools ──────────────────────────────────────────────────────────
 
-const PLAN_MODE_TOOLS = ["read", "bash", "grep", "find", "ls"];
+const PLAN_MODE_TOOLS = ["read", "bash", "grep", "find", "ls", "update_plan", "get_goal"] as const;
 const NORMAL_MODE_TOOLS = ["read", "bash", "edit", "write"];
-const PLAN_DISABLED = new Set(["edit", "write"]);
-const MANAGED = new Set([...PLAN_MODE_TOOLS, ...NORMAL_MODE_TOOLS]);
+
+export function isPlanModeToolAllowed(toolName: string): boolean {
+	return (PLAN_MODE_TOOLS as readonly string[]).includes(toolName);
+}
 
 // ── Bash command safety (from pi's plan-mode example) ──────────────
 
@@ -27,10 +29,12 @@ const DESTRUCTIVE = [
 	/\brm\b/i, /\brmdir\b/i, /\bmv\b/i, /\bcp\b/i, /\bmkdir\b/i,
 	/\btouch\b/i, /\bchmod\b/i, /\bchown\b/i, /\bchgrp\b/i, /\bln\b/i,
 	/\btee\b/i, /\btruncate\b/i, /\bdd\b/i, /\bshred\b/i,
+	/(?:^|\s)-(?:exec|execdir|delete|ok|okdir)\b/i, /\bxargs\b/i,
 	/(^|[^<])>(?!>)/, />>/,
 	/\bnpm\s+(install|uninstall|update|ci|link|publish)/i,
 	/\byarn\s+(add|remove|install|publish)/i,
 	/\bpnpm\s+(add|remove|install|publish)/i,
+	/\b(?:npm|yarn|pnpm|bun)\s+(run|exec|dlx)\b/i,
 	/\bpip\s+(install|uninstall)/i,
 	/\bapt(-get)?\s+(install|remove|purge|update|upgrade)/i,
 	/\bbrew\s+(install|uninstall|upgrade)/i,
@@ -39,8 +43,12 @@ const DESTRUCTIVE = [
 	/\breboot\b/i, /\bshutdown\b/i,
 	/\bsystemctl\s+(start|stop|restart|enable|disable)/i,
 	/\bservice\s+\S+\s+(start|stop|restart)/i,
-	/\b(vim?|nano|emacs|code|subl)\b/i,
+	/\b(?:vim?|nano|emacs|code|subl|sh|bash|zsh|fish|dash|ksh|node|bun|deno|python\d*|perl|ruby|php|lua)\b/i,
+	/\b(?:curl|wget|nc|netcat|scp|sftp|ssh)\b/i,
+	/\b(?:system|eval|exec|source)\s*\(/i,
 ];
+
+const SHELL_CONTROL = /(?:&&|\|\||[;&|<>`$()]|\r|\n)/;
 
 const SAFE = [
 	/^\s*cat\b/, /^\s*head\b/, /^\s*tail\b/, /^\s*less\b/, /^\s*more\b/,
@@ -48,15 +56,14 @@ const SAFE = [
 	/^\s*printf\b/, /^\s*wc\b/, /^\s*sort\b/, /^\s*uniq\b/, /^\s*diff\b/,
 	/^\s*file\b/, /^\s*tree\b/, /^\s*stat\b/, /^\s*du\b/, /^\s*df\b/,
 	/^\s*rg\b/, /^\s*fd\b/, /^\s*bat\b/, /^\s*eza\b/, /^\s*jq\b/,
-	/^\s*sed\s+-n/i, /^\s*awk\b/,
+	/^\s*sed\s+-n/i, /^\s*awk\b(?!.*\b(?:system|getline)\b)/i,
 	/^\s*git\s+(status|log|diff|branch|show|blame|remote|stash\s+list|reflog)/i,
 	/^\s*npm\s+(list|outdated|info|view|ls)/i,
-	/^\s*python\s+--version/i, /^\s*node\s+--version/i, /^\s*node\s+-v\b/,
 	/^\s*uname\b/, /^\s*whoami\b/, /^\s*date\b/, /^\s*uptime\b/,
-	/^\s*curl\s/i, /^\s*wget\s+-O\s*-/i,
 ];
 
-function isSafeCommand(command: string): boolean {
+export function isSafeCommand(command: string): boolean {
+	if (SHELL_CONTROL.test(command)) return false;
 	const destructive = DESTRUCTIVE.some((p) => p.test(command));
 	const safe = SAFE.some((p) => p.test(command));
 	return !destructive && safe;
@@ -89,11 +96,7 @@ export default function planModeExtension(pi: ExtensionAPI): void {
 			const d = entry.data as PlanModeState | undefined;
 			if (d) planState = d;
 		}
-		if (planState.enabled) {
-			// Re-apply read-only tools
-			planState.toolsBefore = pi.getActiveTools();
-			applyPlanModeTools();
-		}
+		if (planState.enabled) applyPlanModeTools();
 		refreshStatus(ctx);
 	};
 
@@ -106,23 +109,17 @@ export default function planModeExtension(pi: ExtensionAPI): void {
 	}
 
 	function applyPlanModeTools(): void {
-		const current = pi.getActiveTools();
-		pi.setActiveTools(
-			unique([
-				...current.filter((n) => !PLAN_DISABLED.has(n)),
-				...PLAN_MODE_TOOLS,
-			]),
-		);
+		if (planState.toolsBefore === undefined) {
+			planState.toolsBefore = pi.getActiveTools();
+		}
+		const available = new Set(pi.getAllTools().map((tool) => tool.name));
+		pi.setActiveTools(PLAN_MODE_TOOLS.filter((name) => available.has(name)));
 	}
 
 	function restoreNormalTools(): void {
-		const before = planState.toolsBefore ?? NORMAL_MODE_TOOLS;
-		pi.setActiveTools(
-			unique([
-				...NORMAL_MODE_TOOLS,
-				...before.filter((n) => !MANAGED.has(n)),
-			]),
-		);
+		const before = planState.toolsBefore;
+		planState.toolsBefore = undefined;
+		pi.setActiveTools(before ?? unique([...NORMAL_MODE_TOOLS, ...pi.getActiveTools()]));
 	}
 
 	// ── Toggle ─────────────────────────────────────────────────────
@@ -159,16 +156,28 @@ export default function planModeExtension(pi: ExtensionAPI): void {
 
 	// ── Block destructive bash in plan mode ────────────────────────
 	pi.on("tool_call", (event) => {
-		if (!planState.enabled || event.toolName !== "bash") return;
-		const command = event.input.command as string;
-		if (!isSafeCommand(command)) {
+		if (!planState.enabled) return;
+
+		if (!isPlanModeToolAllowed(event.toolName)) {
 			return {
 				block: true,
 				reason:
-					`Plan mode: command blocked (not allowlisted).\n` +
-					`Command: ${command}\n` +
+					`Plan mode: tool "${event.toolName}" is not allowed.\n` +
 					`Use /plan to disable plan mode first.`,
 			};
+		}
+
+		if (event.toolName === "bash") {
+			const command = event.input.command as string;
+			if (!isSafeCommand(command)) {
+				return {
+					block: true,
+					reason:
+						`Plan mode: command blocked (not allowlisted).\n` +
+						`Command: ${command}\n` +
+						`Use /plan to disable plan mode first.`,
+				};
+			}
 		}
 	});
 

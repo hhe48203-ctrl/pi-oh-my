@@ -9,14 +9,23 @@ import subagent from "./packages/subagent/index.ts";
 import logAnalyze from "./packages/log-analyze/index.ts";
 import { registerBuiltInToolCards } from "./packages/builtin-tools/index.ts";
 
+const ALL_BUILTIN_TOOLS = ["read", "bash", "edit", "write", "find", "grep", "ls"];
+
 export default function (pi: ExtensionAPI) {
 	registerBuiltInToolCards(pi);
+
+	// Register this before Plan Mode so its startup activation is followed by
+	// Plan Mode's final read-only tool reconciliation.
+	pi.on("session_start", () => {
+		pi.setActiveTools([...new Set([...pi.getActiveTools(), ...ALL_BUILTIN_TOOLS])]);
+	});
+
 	hashline(pi);
 	rulesInjection(pi);
 	initDeep(pi);
 	updatePlan(pi);
-	planMode(pi);
 	goalMode(pi);
 	subagent(pi);
 	logAnalyze(pi);
+	planMode(pi);
 }
