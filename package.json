@@ -1,7 +1,7 @@
 {
   "name": "pi-oh-my",
   "version": "0.1.0",
-  "description": "Enhancements for Pi coding agent — hashline, rules, /init-deep, update_plan, plan mode, goal mode, subagent",
+  "description": "Enhancements for Pi coding agent — hashline, rules, /init-deep, update_plan, plan/goal modes, subagents, background tasks, log analysis",
   "type": "module",
   "pi": {
     "extensions": [

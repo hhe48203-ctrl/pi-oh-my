@@ -11,7 +11,7 @@
  *
  * /goal pause|resume|clear are user-controlled lifecycle commands.
  *
- * Requires: pi-oh-my-update-plan installed (for step tracking).
+ * Works standalone; update-plan can be installed separately for step tracking.
  */
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
