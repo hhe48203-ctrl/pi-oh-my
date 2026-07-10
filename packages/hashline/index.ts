@@ -75,11 +75,18 @@ function registerHashlineEditTool(pi: ExtensionAPI): void {
 		name: "hashline_edit",
 		label: "Hashline Edit",
 		description:
-			'Edit a file using hash-anchored line references. When you read a file, each line is tagged as LINE#HASH| content (e.g., "11#ABC| function hello() {"). Use startAnchor="11#ABC" to reference that line. The hash validates the line hasn\'t changed since you read it — if it has, the edit is rejected and you must re-read. Pass endAnchor for range replacement (inclusive). Multiple edits in one call are applied atomically (all validated before any applied).',
+			"Edit a file using hash-anchored line references from read output. " +
+			"Each line in read output is tagged as LINE#HASH| content (e.g. \"11#ABC| function hello() {\"). " +
+			"Use startAnchor=\"11#ABC\" to reference that line. " +
+			"The hash validates the line hasn't changed — if it has, re-read and retry. " +
+			"Pass endAnchor for range replacement (inclusive). " +
+			"Multiple edits in one call are applied atomically.",
 		promptSnippet:
-			"Edit files by referencing line#hash anchors from read output (e.g., 11#ABC). Zero stale-line errors.",
+			"hashline_edit: edit files using line#hash anchors from read output — never fails on stale lines, prefer over edit",
 		promptGuidelines: [
-			'Use hashline_edit instead of edit when the read output shows LINE#HASH| anchors. Parse the anchor from the line tag (e.g., use startAnchor="11#ABC" for line tagged "11#ABC| content"). The hash validates the line hasn\'t changed. If you get a stale-line error, re-read the file and retry.',
+			"Prefer `hashline_edit` over `edit` — it uses line#hash anchors from read output and never fails on stale lines.",
+			"Grab the anchor from the line tag in read output (e.g. startAnchor=\"11#ABC\" for a line tagged \"11#ABC| content\").",
+			"On stale-line errors, re-read the file and retry with fresh anchors.",
 		],
 		parameters: Type.Object({
 			path: Type.String({ description: "Path to the file to edit (relative or absolute)" }),

@@ -14,8 +14,8 @@
 
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import type { Database } from "bun:sqlite";
 import { ensureSchema, extractTextPreview } from "./db.ts";
+import type { LogDatabase } from "./db.ts";
 import {
   importSessionFile,
   importAllSessions,
@@ -27,12 +27,13 @@ import {
 const MAX_DISPLAY_ROWS = 50;
 const MAX_CELL_WIDTH = 120;
 
-let db: Database | null = null;
+let db: LogDatabase | null = null;
 let currentSessionFile: string | null = null;
 
-function getDb(): Database {
+function getDb(): LogDatabase | null {
   if (!db) {
     db = openLogDb();
+    if (!db) return null;
   } else {
     ensureSchema(db);
   }
@@ -81,6 +82,10 @@ function formatTable(rows: Record<string, unknown>[]): string[] {
 
 function runQuery(ctx: ExtensionCommandContext, sql: string): void {
   const database = getDb();
+  if (!database) {
+    ctx.ui.notify("Log database unavailable (no SQLite runtime).", "warning");
+    return;
+  }
   try {
     const trimmed = sql.trim().toLowerCase();
     const isSelect =
@@ -107,6 +112,10 @@ function runQuery(ctx: ExtensionCommandContext, sql: string): void {
 
 function showStats(ctx: ExtensionCommandContext): void {
   const database = getDb();
+  if (!database) {
+    ctx.ui.notify("Log database unavailable (no SQLite runtime).", "warning");
+    return;
+  }
 
   const views: Array<{ label: string; sql: string }> = [
     { label: "Daily Stats", sql: "SELECT * FROM v_daily_stats" },
@@ -132,8 +141,12 @@ function showStats(ctx: ExtensionCommandContext): void {
 }
 
 function doFullImport(ctx: ExtensionCommandContext): void {
-  ctx.ui.setStatus("log-import", "Importing all sessions...");
   const database = getDb();
+  if (!database) {
+    ctx.ui.notify("Log database unavailable (no SQLite runtime).", "warning");
+    return;
+  }
+  ctx.ui.setStatus("log-import", "Importing all sessions...");
   const total = importAllSessions(database);
 
   // Quick stats after import
@@ -155,7 +168,7 @@ function doFullImport(ctx: ExtensionCommandContext): void {
 export default function logAnalyze(pi: ExtensionAPI): void {
   // ── session_start: open DB, find current session file ──────────
   pi.on("session_start", (_e, ctx) => {
-    getDb(); // ensure DB is open
+    if (!getDb()) return; // DB unavailable, skip
     // The session file may not exist yet on a brand-new session;
     // we'll pick it up on agent_end instead.
     try {
@@ -163,18 +176,19 @@ export default function logAnalyze(pi: ExtensionAPI): void {
       if (sf) {
         currentSessionFile = sf;
         // Import any existing lines (e.g., resumed session)
-        importSessionFile(db!, sf);
+        importSessionFile(db, sf);
       }
     } catch {}
   });
 
   // ── agent_end: incremental import of new session lines ─────────
   pi.on("agent_end", (_e, ctx) => {
+    if (!db) return;
     try {
       const sf = ctx.sessionManager.getSessionFile() ?? currentSessionFile;
       if (sf) {
         currentSessionFile = sf;
-        importSessionFile(db!, sf);
+        importSessionFile(db, sf);
       }
     } catch {}
   });

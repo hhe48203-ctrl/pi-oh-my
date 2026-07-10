@@ -8,7 +8,15 @@
  * Plus an import_state table for incremental sync (tracks per-file line offset).
  */
 
-import type { Database } from "bun:sqlite";
+// Minimal Database interface — works with both bun:sqlite and better-sqlite3
+export interface LogDatabase {
+  exec(sql: string): void;
+  prepare(sql: string): { run(...params: unknown[]): unknown; get(...params: unknown[]): unknown; all(...params: unknown[]): unknown[] };
+  query(sql: string): { all(...params: unknown[]): unknown[]; get(...params: unknown[]): unknown };
+  run(sql: string, ...params: unknown[]): { changes?: number };
+  close(): void;
+  transaction(fn: () => void): () => void;
+}
 
 const SCHEMA = `
 PRAGMA journal_mode = WAL;
@@ -121,7 +129,7 @@ CREATE VIEW IF NOT EXISTS v_tool_stats AS
   ORDER BY calls DESC;
 `;
 
-export function ensureSchema(db: Database): void {
+export function ensureSchema(db: LogDatabase): void {
   db.exec(SCHEMA);
 }
 

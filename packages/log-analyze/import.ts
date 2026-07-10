@@ -7,12 +7,35 @@
 
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { Database } from "bun:sqlite";
 import { ensureSchema, extractTextPreview } from "./db.ts";
 
 const HOME = process.env.HOME || process.env.USERPROFILE || "/tmp";
 export const SESSIONS_DIR = join(HOME, ".pi", "agent", "sessions");
 export const DB_PATH = join(HOME, ".pi", "agent", "log.db");
+
+type Database = {
+  exec(sql: string): void;
+  prepare(sql: string): { run(...params: unknown[]): unknown; get(...params: unknown[]): unknown; all(...params: unknown[]): unknown[] };
+  query(sql: string): { all(...params: unknown[]): unknown[]; get(...params: unknown[]): unknown };
+  run(sql: string, ...params: unknown[]): { changes?: number };
+  close(): void;
+  transaction(fn: () => void): () => void;
+};
+
+let DatabaseCtor: { new (path: string): Database } | null = null;
+try {
+  // Bun runtime
+  const mod = await import("bun:sqlite");
+  DatabaseCtor = mod.Database;
+} catch {
+  try {
+    // Node runtime with better-sqlite3
+    const mod = await import("better-sqlite3");
+    DatabaseCtor = mod.default ?? mod.Database;
+  } catch {
+    // No SQLite available — log-analyze will be disabled
+  }
+}
 
 interface ImportState {
   lines_imported: number;
@@ -53,7 +76,8 @@ interface SessionJsonlEntry {
  * Import new lines from a single session file into the database.
  * Returns the number of newly imported rows.
  */
-export function importSessionFile(db: Database, sessionFile: string): number {
+export function importSessionFile(db: Database | null, sessionFile: string): number {
+  if (!db) return 0;
   if (!existsSync(sessionFile)) return 0;
 
   const state = db
@@ -176,8 +200,9 @@ export function importSessionFile(db: Database, sessionFile: string): number {
  * Import all session files under SESSIONS_DIR.
  * Returns total imported rows.
  */
-export function importAllSessions(db: Database, dir: string = SESSIONS_DIR): number {
-  ensureSchema(db);
+export function importAllSessions(db: Database | null, dir: string = SESSIONS_DIR): number {
+  if (!db) return 0;
+  ensureSchema(db as any);
 
   if (!existsSync(dir)) return 0;
 
@@ -200,9 +225,11 @@ export function importAllSessions(db: Database, dir: string = SESSIONS_DIR): num
 
 /**
  * Open (or create) the log database.
+ * Returns null if no SQLite runtime is available (e.g. node without better-sqlite3).
  */
-export function openLogDb(path: string = DB_PATH): Database {
-  const db = new Database(path);
-  ensureSchema(db);
-  return db;
+export function openLogDb(path: string = DB_PATH): Database | null {
+  if (!DatabaseCtor) return null;
+  const db = new DatabaseCtor(path);
+  ensureSchema(db as any);
+  return db as any;
 }
