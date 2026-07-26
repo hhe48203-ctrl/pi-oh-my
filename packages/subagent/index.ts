@@ -18,6 +18,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { renderToolCall, renderToolResult } from "../tool-render.ts";
 import { registerAsyncSubagentTool } from "./async-subagent.ts";
 import { registerBackgroundTools } from "./background.ts";
+import { appendOutput } from "./background-runtime.ts";
 import {
   DEFAULT_TIMEOUT_MS,
   DEFAULT_TOOLS,
@@ -106,15 +107,30 @@ export default function (pi: ExtensionAPI) {
       if (model) args.push("--model", model);
       args.push(prompt);
 
-      const child = spawn("pi", args, { cwd: ctx.cwd, stdio: ["ignore", "pipe", "pipe"] });
+      const child = spawn("pi", args, {
+        cwd: ctx.cwd,
+        detached: process.platform !== "win32",
+        stdio: ["ignore", "pipe", "pipe"],
+      });
 
       let timedOut = false;
       let childClosed = false;
       let forceKillTimer: ReturnType<typeof setTimeout> | undefined;
+      const signalChild = (childSignal: NodeJS.Signals) => {
+        if (process.platform !== "win32" && child.pid !== undefined) {
+          try {
+            process.kill(-child.pid, childSignal);
+            return;
+          } catch {
+            // Fall back to the direct child when process-group signalling is unavailable.
+          }
+        }
+        child.kill(childSignal);
+      };
       const terminateChild = () => {
         if (childClosed) return;
-        child.kill("SIGTERM");
-        forceKillTimer = setTimeout(() => { if (!childClosed) child.kill("SIGKILL"); }, KILL_GRACE_MS);
+        signalChild("SIGTERM");
+        forceKillTimer = setTimeout(() => { if (!childClosed) signalChild("SIGKILL"); }, KILL_GRACE_MS);
       };
       const onAbort = () => terminateChild();
       if (signal?.aborted) terminateChild();
@@ -123,8 +139,8 @@ export default function (pi: ExtensionAPI) {
 
       let out = "";
       let err = "";
-      child.stdout?.on("data", (d: Buffer) => { out += d; });
-      child.stderr?.on("data", (d: Buffer) => { err += d; });
+      child.stdout?.on("data", (d: Buffer) => { out = appendOutput(out, d.toString()); });
+      child.stderr?.on("data", (d: Buffer) => { err = appendOutput(err, d.toString()); });
 
       try {
         const r = await new Promise<{ code: number | null; sig: string | null; error: Error | null }>((resolve) => {
