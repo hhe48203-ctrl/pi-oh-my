@@ -16,6 +16,7 @@ export const MAX_STORED_OUTPUT = 100_000;
 export const MAX_CHECK_OUTPUT = 10_000;
 export const MAX_BG_TASKS = 4;
 export const MAX_PANEL_TASKS = 6;
+export const MAX_COMPLETED_TASKS = 24;
 export const MAX_PANEL_LABEL = 44;
 export const PANEL_REFRESH_MS = 1_000;
 export const MAX_ERROR_STDERR = 1_500;

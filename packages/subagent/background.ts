@@ -13,6 +13,7 @@ import { checkTask, rememberBackgroundContext, shutdownBackgroundTasks, spawnBgT
 
 export {
   appendOutput,
+  finishedTaskIdsToPrune,
   formatTaskPanelLines,
   formatTaskStatus,
   isTaskFinished,

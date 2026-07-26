@@ -7,6 +7,7 @@ import {
   KILL_GRACE_MS,
   MAX_BG_TASKS,
   MAX_CHECK_OUTPUT,
+  MAX_COMPLETED_TASKS,
   MAX_PANEL_LABEL,
   MAX_PANEL_TASKS,
   MAX_STORED_OUTPUT,
@@ -96,16 +97,32 @@ function panelLabel(label: string): string {
 
 export function formatTaskPanelLines(tasks: readonly BgTaskSnapshot[], now = Date.now()): string[] {
   if (tasks.length === 0) return [];
-  const visible = tasks.slice(0, MAX_PANEL_TASKS);
+  const ordered = [...tasks].sort((a, b) => {
+    const aRunning = a.finishedAt === null;
+    const bRunning = b.finishedAt === null;
+    if (aRunning !== bRunning) return aRunning ? -1 : 1;
+    return (b.finishedAt ?? b.startedAt) - (a.finishedAt ?? a.startedAt);
+  });
+  const visible = ordered.slice(0, MAX_PANEL_TASKS);
   const lines = ["Background Tasks"];
   for (const task of visible) {
     lines.push(
       `${taskStatus(task).padEnd(11)} ${task.id} ${task.kind.padEnd(8)} ${elapsedSeconds(task, now).padStart(6)} ${panelLabel(task.label)}`,
     );
   }
-  const hidden = tasks.length - visible.length;
+  const hidden = ordered.length - visible.length;
   if (hidden > 0) lines.push(`... ${hidden} more task${hidden === 1 ? "" : "s"}`);
   return lines;
+}
+
+export function finishedTaskIdsToPrune(
+  tasks: readonly BgTaskSnapshot[],
+  maxCompleted = MAX_COMPLETED_TASKS,
+): string[] {
+  const completed = tasks
+    .filter((task) => task.finishedAt !== null)
+    .sort((a, b) => (a.finishedAt ?? 0) - (b.finishedAt ?? 0));
+  return completed.slice(0, Math.max(0, completed.length - maxCompleted)).map((task) => task.id);
 }
 
 function updatePanelRefreshTimer(): void {
@@ -128,6 +145,11 @@ function refreshBackgroundWidget(): void {
   const lines = formatTaskPanelLines([...bgTasks.values()].map(snapshotTask));
   widgetContext.ui.setWidget(BG_WIDGET_KEY, lines.length > 0 ? lines : undefined, { placement: "belowEditor" });
   updatePanelRefreshTimer();
+}
+
+function pruneFinishedTasks(): void {
+  const snapshots = [...bgTasks.values()].map(snapshotTask);
+  for (const id of finishedTaskIdsToPrune(snapshots)) bgTasks.delete(id);
 }
 
 export function rememberBackgroundContext(ctx: ExtensionContext): void {
@@ -157,6 +179,18 @@ function terminateTask(task: BgTask): void {
   task.forceKillTimer = setTimeout(() => {
     signalTask(task, "SIGKILL");
   }, KILL_GRACE_MS);
+}
+
+function finishTask(task: BgTask, exitCode: number | null, signal: string | null, error?: Error): void {
+  if (isTaskFinished(task)) return;
+  task.finishedAt = Date.now();
+  task.exitCode = exitCode;
+  task.signal = signal;
+  if (error) task.stderr = appendOutput(task.stderr, `\n[spawn error: ${error.message}]\n`);
+  if (task.timeoutTimer) clearTimeout(task.timeoutTimer);
+  if (task.forceKillTimer) clearTimeout(task.forceKillTimer);
+  pruneFinishedTasks();
+  refreshBackgroundWidget();
 }
 
 export function spawnBgTask(
@@ -199,18 +233,10 @@ export function spawnBgTask(
   }, timeoutMs);
 
   child.on("error", (e: Error) => {
-    task.finishedAt = Date.now();
-    task.exitCode = -1;
-    task.stderr = appendOutput(task.stderr, `\n[spawn error: ${e.message}]\n`);
-    refreshBackgroundWidget();
+    finishTask(task, -1, null, e);
   });
   child.on("close", (code, sig) => {
-    task.finishedAt = Date.now();
-    task.exitCode = code;
-    task.signal = sig;
-    clearTimeout(task.timeoutTimer);
-    if (task.forceKillTimer) clearTimeout(task.forceKillTimer);
-    refreshBackgroundWidget();
+    finishTask(task, code, sig);
   });
 
   child.unref();

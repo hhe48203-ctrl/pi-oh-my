@@ -147,7 +147,7 @@ check_delegate({ task_id: "e5f6g7h8" })
 → "Status: completed, --- output --- ..."
 ```
 
-Background tasks run in detached processes with their own timeout (default 10 min). Output is buffered (last 100KB); checks return the last 10KB. Tasks are killed on session shutdown.
+Background tasks run in detached processes with their own timeout (default 10 min). Output is buffered (last 100KB); checks return the last 10KB. The panel prioritizes running tasks and retains the 24 most recent completed tasks until they are checked. Tasks are killed on session shutdown.
 
 **Log Analyze**:
 

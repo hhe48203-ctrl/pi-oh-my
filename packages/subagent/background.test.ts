@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { appendOutput, formatTaskStatus, isTaskFinished, type BgTask } from "./background.ts";
+import { appendOutput, finishedTaskIdsToPrune, formatTaskStatus, isTaskFinished, type BgTask, type BgTaskSnapshot } from "./background.ts";
 
 // Helper: create a minimal fake BgTask (no real child process)
 function makeFakeTask(overrides: Partial<BgTask> = {}): BgTask {
@@ -116,5 +116,25 @@ describe("formatTaskStatus", () => {
     const status = formatTaskStatus(task);
     expect(status).not.toContain("--- output ---");
     expect(status).not.toContain("--- stderr ---");
+  });
+});
+
+describe("finishedTaskIdsToPrune", () => {
+  it("keeps active tasks and the newest completed task history", () => {
+    const tasks: BgTaskSnapshot[] = [
+      { id: "old", kind: "bash", label: "old", startedAt: 1, finishedAt: 10, exitCode: 0, signal: null, timedOut: false },
+      { id: "new", kind: "bash", label: "new", startedAt: 2, finishedAt: 20, exitCode: 0, signal: null, timedOut: false },
+      { id: "running", kind: "bash", label: "running", startedAt: 3, finishedAt: null, exitCode: null, signal: null, timedOut: false },
+    ];
+
+    expect(finishedTaskIdsToPrune(tasks, 1)).toEqual(["old"]);
+  });
+
+  it("does not prune when completed history is within the limit", () => {
+    const tasks: BgTaskSnapshot[] = [
+      { id: "done", kind: "subagent", label: "done", startedAt: 1, finishedAt: 2, exitCode: 0, signal: null, timedOut: false },
+    ];
+
+    expect(finishedTaskIdsToPrune(tasks, 1)).toEqual([]);
   });
 });

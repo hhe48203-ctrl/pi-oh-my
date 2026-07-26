@@ -40,4 +40,14 @@ describe("formatTaskPanelLines", () => {
 	it("returns no lines when there are no tasks", () => {
 		expect(formatTaskPanelLines([], now)).toEqual([]);
 	});
+
+	it("shows active tasks before retained task history", () => {
+		const lines = formatTaskPanelLines([
+			task({ id: "done", label: "done", finishedAt: 2_000, exitCode: 0 }),
+			task({ id: "running", kind: "subagent", label: "running" }),
+		], now);
+
+		expect(lines[1]).toContain("running");
+		expect(lines[2]).toContain("done");
+	});
 });
