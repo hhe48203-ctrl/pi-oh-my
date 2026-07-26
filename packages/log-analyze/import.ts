@@ -13,7 +13,7 @@ const HOME = process.env.HOME || process.env.USERPROFILE || "/tmp";
 export const SESSIONS_DIR = join(HOME, ".pi", "agent", "sessions");
 export const DB_PATH = join(HOME, ".pi", "agent", "log.db");
 
-type Database = {
+export type Database = {
   exec(sql: string): void;
   prepare(sql: string): { run(...params: unknown[]): unknown; get(...params: unknown[]): unknown; all(...params: unknown[]): unknown[] };
   query(sql: string): { all(...params: unknown[]): unknown[]; get(...params: unknown[]): unknown };
@@ -22,19 +22,64 @@ type Database = {
   transaction(fn: () => void): () => void;
 };
 
-let DatabaseCtor: { new (path: string): Database } | null = null;
+type RawDatabase = {
+  exec(sql: string): void;
+  prepare(sql: string): { run(...params: unknown[]): unknown; get(...params: unknown[]): unknown; all(...params: unknown[]): unknown[] };
+  close(): void;
+  query?(sql: string): { all(...params: unknown[]): unknown[]; get(...params: unknown[]): unknown };
+  run?(sql: string, ...params: unknown[]): { changes?: number };
+  transaction?(fn: () => void): () => void;
+};
+
+type DatabaseConstructor = { new (path: string): RawDatabase };
+
+let DatabaseCtor: DatabaseConstructor | null = null;
 try {
   // Bun runtime
-  const mod = await import("bun:sqlite");
-  DatabaseCtor = mod.Database;
+  const mod = await import("bun:sqlite") as { Database?: DatabaseConstructor };
+  DatabaseCtor = mod.Database ?? null;
 } catch {
   try {
-    // Node runtime with better-sqlite3
-    const mod = await import("better-sqlite3");
-    DatabaseCtor = mod.default ?? mod.Database;
+    // Node 22+ ships a built-in SQLite driver.
+    const mod = await import("node:sqlite") as { DatabaseSync?: DatabaseConstructor };
+    DatabaseCtor = mod.DatabaseSync ?? null;
   } catch {
-    // No SQLite available — log-analyze will be disabled
+    try {
+      // Older Node runtimes can use better-sqlite3 when Pi provides it.
+      const mod = await import("better-sqlite3") as { default?: DatabaseConstructor; Database?: DatabaseConstructor };
+      DatabaseCtor = mod.default ?? mod.Database ?? null;
+    } catch {
+      // No SQLite available — log-analyze will be disabled.
+    }
   }
+}
+
+export function adaptDatabase(raw: RawDatabase): Database {
+  return {
+    exec: raw.exec.bind(raw),
+    prepare: raw.prepare.bind(raw),
+    query: raw.query ? raw.query.bind(raw) : raw.prepare.bind(raw),
+    run: raw.run
+      ? raw.run.bind(raw)
+      : (sql, ...params) => raw.prepare(sql).run(...params) as { changes?: number },
+    close: raw.close.bind(raw),
+    transaction: raw.transaction
+      ? raw.transaction.bind(raw)
+      : (fn) => () => {
+        raw.exec("BEGIN");
+        try {
+          fn();
+          raw.exec("COMMIT");
+        } catch (error) {
+          try {
+            raw.exec("ROLLBACK");
+          } catch {
+            // Preserve the original transaction error.
+          }
+          throw error;
+        }
+      },
+  };
 }
 
 interface ImportState {
@@ -118,7 +163,7 @@ export function importSessionFile(db: Database | null, sessionFile: string): num
   let imported = 0;
 
   db.transaction(() => {
-    for (const line of newLines) {
+    for (const [offset, line] of newLines.entries()) {
       let d: SessionJsonlEntry;
       try {
         d = JSON.parse(line) as SessionJsonlEntry;
@@ -130,7 +175,7 @@ export function importSessionFile(db: Database | null, sessionFile: string): num
       const ts = d.timestamp ? Date.parse(d.timestamp) : (msg?.timestamp ?? 0);
 
       // Generate a stable ID if not present
-      const id = d.id ?? `${sessionId}#${startLine + imported}`;
+      const id = d.id ?? `${sessionId}#${startLine + offset}`;
       const role = msg?.role ?? (d.type === "custom" ? "custom" : "unknown");
       const contentJson = JSON.stringify(msg?.content ?? d.data ?? null);
       const textPreview = extractTextPreview(msg?.content ?? d.data);
@@ -229,7 +274,11 @@ export function importAllSessions(db: Database | null, dir: string = SESSIONS_DI
  */
 export function openLogDb(path: string = DB_PATH): Database | null {
   if (!DatabaseCtor) return null;
-  const db = new DatabaseCtor(path);
-  ensureSchema(db as any);
-  return db as any;
+  try {
+    const db = adaptDatabase(new DatabaseCtor(path));
+    ensureSchema(db);
+    return db;
+  } catch {
+    return null;
+  }
 }

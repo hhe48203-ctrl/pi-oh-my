@@ -151,6 +151,8 @@ Background tasks run in detached processes with their own timeout (default 10 mi
 
 **Log Analyze**:
 
+Uses Bun's SQLite driver when available, Node 22+'s built-in SQLite driver otherwise, and falls back to `better-sqlite3` on older Node runtimes when present.
+
 ```
 /log SELECT * FROM v_daily_stats
 /log-stats
