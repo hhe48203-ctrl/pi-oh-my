@@ -49,6 +49,20 @@ describe("getFinalAssistantText", () => {
 
     expect(getFinalAssistantText(messages)).toBe("new");
   });
+
+  it("joins all text blocks from the latest assistant message", () => {
+    const messages = [
+      {
+        role: "assistant",
+        content: [
+          { type: "text", text: "first" },
+          { type: "text", text: "second" },
+        ],
+      },
+    ] as any;
+
+    expect(getFinalAssistantText(messages)).toBe("first\nsecond");
+  });
 });
 
 describe("resolveModel", () => {

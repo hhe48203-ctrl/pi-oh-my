@@ -43,9 +43,12 @@ export function getFinalAssistantText(messages: readonly Message[]): string {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
     if (message?.role !== "assistant") continue;
-    for (const part of message.content) {
-      if (part.type === "text") return part.text.trim();
-    }
+    const text = message.content
+      .filter((part): part is Extract<typeof part, { type: "text" }> => part.type === "text")
+      .map((part) => part.text)
+      .join("\n")
+      .trim();
+    if (text) return text;
   }
   return "";
 }
@@ -70,6 +73,9 @@ export async function runInProcessSubagent(options: InProcessSubagentOptions): P
   const timeoutMs =
     typeof options.timeoutMs === "number" && options.timeoutMs > 0 ? options.timeoutMs : DEFAULT_TIMEOUT_MS;
   const selectedModel = resolveModel(options.modelRegistry, options.currentModel, options.model);
+  if (options.model && !selectedModel) {
+    throw new Error(`Requested model not found: ${options.model}`);
+  }
 
   const { session } = await createAgentSession({
     cwd: options.cwd,
