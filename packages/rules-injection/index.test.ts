@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { findDirectoryAgentsMd, formatAgentsMdBlock } from "./index.ts";
+import { findDirectoryAgentsMd, formatAgentsMdBlock, InjectedPathsCache } from "./index.ts";
 
 let tmpDir: string;
 
@@ -86,4 +86,27 @@ describe("formatAgentsMdBlock", () => {
     const block = await formatAgentsMdBlock(filePath);
     expect(block).not.toContain("truncated");
   });
+});
+
+describe("InjectedPathsCache", () => {
+	it("deduplicates per session instance, including unsaved sessions", () => {
+		const cache = new InjectedPathsCache();
+		const firstSession = {};
+		const secondSession = {};
+
+		cache.add(firstSession, "/project/AGENTS.md");
+
+		expect(cache.has(firstSession, "/project/AGENTS.md")).toBe(true);
+		expect(cache.has(secondSession, "/project/AGENTS.md")).toBe(false);
+	});
+
+	it("allows reinjection after compaction clears a session", () => {
+		const cache = new InjectedPathsCache();
+		const session = {};
+
+		cache.add(session, "/project/AGENTS.md");
+		cache.clearSession(session);
+
+		expect(cache.has(session, "/project/AGENTS.md")).toBe(false);
+	});
 });

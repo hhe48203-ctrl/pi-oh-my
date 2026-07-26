@@ -28,28 +28,24 @@ export async function formatAgentsMdBlock(agentsMdPath: string): Promise<string 
 	}
 }
 
-class InjectedPathsCache {
-	private map = new Map<string, Set<string>>();
-	private getKey(sessionFile: string | undefined): string {
-		return sessionFile ?? "ephemeral";
+export class InjectedPathsCache {
+	private map = new WeakMap<object, Set<string>>();
+	has(session: object, agentsMdPath: string): boolean {
+		return this.map.get(session)?.has(agentsMdPath) ?? false;
 	}
-	has(sessionFile: string | undefined, agentsMdPath: string): boolean {
-		return this.map.get(this.getKey(sessionFile))?.has(agentsMdPath) ?? false;
-	}
-	add(sessionFile: string | undefined, agentsMdPath: string): void {
-		const key = this.getKey(sessionFile);
-		let set = this.map.get(key);
+	add(session: object, agentsMdPath: string): void {
+		let set = this.map.get(session);
 		if (!set) {
 			set = new Set();
-			this.map.set(key, set);
+			this.map.set(session, set);
 		}
 		set.add(agentsMdPath);
 	}
-	clearSession(sessionFile: string | undefined): void {
-		this.map.delete(this.getKey(sessionFile));
+	clearSession(session: object): void {
+		this.map.delete(session);
 	}
 	clear(): void {
-		this.map.clear();
+		this.map = new WeakMap();
 	}
 }
 
@@ -73,12 +69,12 @@ export default function (pi: ExtensionAPI) {
 			const agentsMdPath = findDirectoryAgentsMd(dir);
 
 			if (agentsMdPath) {
-				const sessionFile = ctx.sessionManager.getSessionFile();
-				if (!injectedCache.has(sessionFile, agentsMdPath)) {
+				const session = ctx.sessionManager;
+				if (!injectedCache.has(session, agentsMdPath)) {
 					const block = await formatAgentsMdBlock(agentsMdPath);
 					if (block) {
 						const newText = textPart.text + block;
-						injectedCache.add(sessionFile, agentsMdPath);
+						injectedCache.add(session, agentsMdPath);
 						const newContent = event.content.map((c) => {
 							if (c.type === "text") return { type: "text" as const, text: newText };
 							return c;
@@ -91,10 +87,10 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.on("session_compact", async (_event, ctx) => {
-		injectedCache.clearSession(ctx.sessionManager.getSessionFile());
+		injectedCache.clearSession(ctx.sessionManager);
 	});
 
-	pi.on("session_shutdown", async () => {
-		injectedCache.clear();
+	pi.on("session_shutdown", async (_event, ctx) => {
+		injectedCache.clearSession(ctx.sessionManager);
 	});
 }
