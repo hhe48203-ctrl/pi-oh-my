@@ -20,6 +20,11 @@ export interface Anchor {
 	hash: string;
 }
 
+export interface LineRange {
+	start: number;
+	end: number;
+}
+
 export function parseAnchor(anchor: string): Anchor {
 	const m = anchor.match(/^(\d+)#([0-9A-Z]+)$/);
 	if (!m) {
@@ -35,6 +40,20 @@ export function parseAnchor(anchor: string): Anchor {
 		);
 	}
 	return { line: parseInt(linePart, 10), hash };
+}
+
+export function findOverlappingRange(ranges: readonly LineRange[]): LineRange | null {
+	const sorted = [...ranges].sort((a, b) => a.start - b.start || a.end - b.end);
+	for (let index = 1; index < sorted.length; index += 1) {
+		const previous = sorted[index - 1]!;
+		const current = sorted[index]!;
+		if (current.start <= previous.end) return current;
+	}
+	return null;
+}
+
+export function splitReplacementContent(newContent: string): string[] {
+	return newContent === "" ? [] : newContent.split("\n");
 }
 
 // ─── Read enhancer ───────────────────────────────────────────────────
@@ -128,6 +147,7 @@ function registerHashlineEditTool(pi: ExtensionAPI): void {
 				return {
 					content: [{ type: "text" as const, text: `Error: Could not read file: ${params.path}` }],
 					details: { error: "read_failed", path: absolutePath },
+					isError: true,
 				};
 			}
 
@@ -146,6 +166,18 @@ function registerHashlineEditTool(pi: ExtensionAPI): void {
 						{ type: "text" as const, text: `Error: ${err instanceof Error ? err.message : String(err)}` },
 					],
 					details: { error: "invalid_anchor" },
+					isError: true,
+				};
+			}
+
+			const overlap = findOverlappingRange(
+				parsedEdits.map((edit) => ({ start: edit.start.line, end: edit.end.line })),
+			);
+			if (overlap) {
+				return {
+					content: [{ type: "text" as const, text: `Error: Overlapping edits are not allowed (overlap starts at line ${overlap.start}).` }],
+					details: { error: "overlapping_edits", line: overlap.start },
+					isError: true,
 				};
 			}
 
@@ -154,18 +186,21 @@ function registerHashlineEditTool(pi: ExtensionAPI): void {
 					return {
 						content: [{ type: "text" as const, text: `Error: Line ${edit.start.line} is out of range (file has ${lines.length} lines).` }],
 						details: { error: "out_of_range", line: edit.start.line, totalLines: lines.length },
+						isError: true,
 					};
 				}
 				if (edit.end.line < 1 || edit.end.line > lines.length) {
 					return {
 						content: [{ type: "text" as const, text: `Error: Line ${edit.end.line} is out of range (file has ${lines.length} lines).` }],
 						details: { error: "out_of_range", line: edit.end.line, totalLines: lines.length },
+						isError: true,
 					};
 				}
 				if (edit.end.line < edit.start.line) {
 					return {
 						content: [{ type: "text" as const, text: `Error: End line ${edit.end.line} is before start line ${edit.start.line}.` }],
 						details: { error: "invalid_range" },
+						isError: true,
 					};
 				}
 
@@ -178,12 +213,14 @@ function registerHashlineEditTool(pi: ExtensionAPI): void {
 					return {
 						content: [{ type: "text" as const, text: `Error: Stale line at ${edit.start.line}#${edit.start.hash}. File has changed since last read.\n  Expected hash: ${edit.start.hash}\n  Actual hash:   ${startActualHash}\n  Line content:  ${startLineContent.slice(0, 100)}\n\nRe-read the file and try again.` }],
 						details: { error: "stale_line", line: edit.start.line, expectedHash: edit.start.hash, actualHash: startActualHash },
+						isError: true,
 					};
 				}
 				if (endActualHash !== edit.end.hash) {
 					return {
 						content: [{ type: "text" as const, text: `Error: Stale line at ${edit.end.line}#${edit.end.hash}. File has changed since last read.\n  Expected hash: ${edit.end.hash}\n  Actual hash:   ${endActualHash}\n\nRe-read the file and try again.` }],
 						details: { error: "stale_line", line: edit.end.line, expectedHash: edit.end.hash, actualHash: endActualHash },
+						isError: true,
 					};
 				}
 			}
@@ -193,7 +230,7 @@ function registerHashlineEditTool(pi: ExtensionAPI): void {
 			const sortedEdits = [...parsedEdits].sort((a, b) => b.start.line - a.start.line);
 
 			for (const edit of sortedEdits) {
-				const newContentLines = edit.newContent.split("\n");
+				const newContentLines = splitReplacementContent(edit.newContent);
 				const replaceCount = edit.end.line - edit.start.line + 1;
 				newLines.splice(edit.start.line - 1, replaceCount, ...newContentLines);
 				const rangeStr = edit.start.line === edit.end.line ? `line ${edit.start.line}` : `lines ${edit.start.line}-${edit.end.line}`;
@@ -206,6 +243,7 @@ function registerHashlineEditTool(pi: ExtensionAPI): void {
 				return {
 					content: [{ type: "text" as const, text: `Error: Could not write file: ${params.path}` }],
 					details: { error: "write_failed", path: absolutePath },
+					isError: true,
 				};
 			}
 

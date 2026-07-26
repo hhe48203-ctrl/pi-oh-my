@@ -1,5 +1,29 @@
-import { describe, it, expect } from "vitest";
-import { lineHash, parseAnchor, enhanceWithHashes } from "./index.ts";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import hashlineExtension, { enhanceWithHashes, findOverlappingRange, lineHash, parseAnchor, splitReplacementContent } from "./index.ts";
+
+let tmpDir: string;
+
+beforeEach(() => {
+	tmpDir = mkdtempSync(join(tmpdir(), "pi-oh-my-hashline-"));
+});
+
+afterEach(() => {
+	rmSync(tmpDir, { recursive: true, force: true });
+});
+
+function getHashlineEditTool(): any {
+	let tool: any;
+	hashlineExtension({
+		registerTool(candidate: any) {
+			if (candidate.name === "hashline_edit") tool = candidate;
+		},
+		on() {},
+	} as any);
+	return tool;
+}
 
 describe("lineHash", () => {
   it("returns 3-char uppercase base36", () => {
@@ -50,6 +74,51 @@ describe("parseAnchor", () => {
   it("throws on letter prefix", () => {
     expect(() => parseAnchor("ab#ABC")).toThrow(/Invalid anchor/);
   });
+});
+
+describe("edit helpers", () => {
+	it("treats an empty replacement as a deletion", () => {
+		expect(splitReplacementContent("")).toEqual([]);
+		expect(splitReplacementContent("first\nsecond")).toEqual(["first", "second"]);
+	});
+
+	it("detects overlapping edit ranges before applying them", () => {
+		expect(findOverlappingRange([{ start: 1, end: 2 }, { start: 2, end: 3 }])).toEqual({ start: 2, end: 3 });
+		expect(findOverlappingRange([{ start: 4, end: 5 }, { start: 1, end: 3 }])).toBeNull();
+	});
+});
+
+describe("hashline_edit", () => {
+	it("deletes the selected line when replacement content is empty", async () => {
+		const path = join(tmpDir, "sample.txt");
+		writeFileSync(path, "alpha\nbeta\ngamma", "utf8");
+		const tool = getHashlineEditTool();
+
+		const result = await tool.execute("call", {
+			path: "sample.txt",
+			edits: [{ startAnchor: `2#${lineHash("beta")}`, newContent: "" }],
+		}, undefined, undefined, { cwd: tmpDir });
+
+		expect(result.isError).not.toBe(true);
+		expect(readFileSync(path, "utf8")).toBe("alpha\ngamma");
+	});
+
+	it("rejects overlapping edits before changing the file", async () => {
+		const path = join(tmpDir, "sample.txt");
+		writeFileSync(path, "alpha\nbeta\ngamma", "utf8");
+		const tool = getHashlineEditTool();
+
+		const result = await tool.execute("call", {
+			path: "sample.txt",
+			edits: [
+				{ startAnchor: `1#${lineHash("alpha")}`, endAnchor: `2#${lineHash("beta")}`, newContent: "first" },
+				{ startAnchor: `2#${lineHash("beta")}`, newContent: "second" },
+			],
+		}, undefined, undefined, { cwd: tmpDir });
+
+		expect(result.isError).toBe(true);
+		expect(readFileSync(path, "utf8")).toBe("alpha\nbeta\ngamma");
+	});
 });
 
 describe("enhanceWithHashes", () => {
