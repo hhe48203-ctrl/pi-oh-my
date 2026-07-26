@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isPlanModeToolAllowed, isSafeCommand } from "./index.ts";
+import { hasPersistedPlan, isPlanModeToolAllowed, isSafeCommand } from "./index.ts";
 
 describe("plan mode tool policy", () => {
 	it("allows read-only tools and plan tracking", () => {
@@ -32,5 +32,21 @@ describe("plan mode bash policy", () => {
 		expect(isSafeCommand("ls > files.txt")).toBe(false);
 		expect(isSafeCommand("python -c 'open(\"x\", \"w\")'")).toBe(false);
 		expect(isSafeCommand("curl https://example.com")).toBe(false);
+	});
+});
+
+describe("plan state detection", () => {
+	it("uses durable plan-state entries after compaction", () => {
+		expect(hasPersistedPlan([
+			{ type: "message", message: { role: "toolResult", toolName: "update_plan", details: { plan: [] } } },
+			{ type: "custom", customType: "plan-state", data: { plan: [{ step: "Implement", status: "in_progress" }] } },
+		])).toBe(true);
+	});
+
+	it("respects the latest empty plan state", () => {
+		expect(hasPersistedPlan([
+			{ type: "message", message: { role: "toolResult", toolName: "update_plan", details: { plan: [{ step: "Old", status: "completed" }] } } },
+			{ type: "custom", customType: "plan-state", data: { plan: [] } },
+		])).toBe(false);
 	});
 });

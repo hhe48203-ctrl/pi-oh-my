@@ -22,14 +22,41 @@ import { renderToolCall } from "../tool-render.ts";
 
 type StepStatus = "pending" | "in_progress" | "completed";
 
-interface PlanItem {
+export interface PlanItem {
 	step: string;
 	status: StepStatus;
 }
 
-interface PlanState {
+export interface PlanState {
 	plan: PlanItem[];
 	explanation?: string;
+}
+
+export function reconstructPlanState(entries: Iterable<unknown>): PlanState {
+	let state: PlanState = { plan: [] };
+	for (const entry of entries) {
+		if (!entry || typeof entry !== "object") continue;
+		const candidate = entry as {
+			type?: string;
+			customType?: string;
+			data?: unknown;
+			message?: { role?: string; toolName?: string; details?: unknown };
+		};
+
+		const persisted =
+			candidate.type === "custom" && candidate.customType === "plan-state"
+				? candidate.data
+				: candidate.type === "message" &&
+					candidate.message?.role === "toolResult" &&
+					candidate.message.toolName === "update_plan"
+					? candidate.message.details
+					: undefined;
+
+		if (!persisted || typeof persisted !== "object") continue;
+		const planState = persisted as PlanState;
+		if (Array.isArray(planState.plan)) state = planState;
+	}
+	return state;
 }
 
 // ── Schema (matches Codex) ─────────────────────────────────────────
@@ -62,16 +89,10 @@ export default function updatePlanExtension(pi: ExtensionAPI): void {
 	let state: PlanState = { plan: [] };
 
 	// ── State reconstruction ───────────────────────────────────────
-	// Scan session branch for the last update_plan tool result.
+	// Prefer the latest durable custom entry, while supporting older sessions
+	// that only have an update_plan tool result.
 	const reconstruct = (ctx: ExtensionContext): void => {
-		state = { plan: [] };
-		for (const entry of ctx.sessionManager.getBranch()) {
-			if (entry.type !== "message") continue;
-			const msg = entry.message;
-			if (msg.role !== "toolResult" || msg.toolName !== "update_plan") continue;
-			const d = msg.details as PlanState | undefined;
-			if (d?.plan) state = d;
-		}
+		state = reconstructPlanState(ctx.sessionManager.getBranch());
 		refreshStatus(ctx);
 	};
 
@@ -122,6 +143,7 @@ export default function updatePlanExtension(pi: ExtensionAPI): void {
 						},
 					],
 					details: state,
+					isError: true,
 				};
 			}
 

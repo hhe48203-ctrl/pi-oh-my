@@ -22,6 +22,21 @@ import type { GoalState, GoalUpdateStatus } from "./state.ts";
 
 const DEFAULT_MAX_TURNS = 40;
 
+export function reconstructGoalState(entries: Iterable<unknown>): GoalState | null {
+	let goal: GoalState | null = null;
+	for (const entry of entries) {
+		if (!entry || typeof entry !== "object") continue;
+		const candidate = entry as { type?: string; customType?: string; data?: unknown };
+		if (candidate.type !== "custom" || candidate.customType !== "goal-state") continue;
+		if (candidate.data === null || candidate.data === undefined) {
+			goal = null;
+			continue;
+		}
+		if (typeof candidate.data === "object") goal = candidate.data as GoalState;
+	}
+	return goal;
+}
+
 // ── Extension ───────────────────────────────────────────────────────
 
 export default function goalModeExtension(pi: ExtensionAPI): void {
@@ -30,14 +45,8 @@ export default function goalModeExtension(pi: ExtensionAPI): void {
 
 	// ── State reconstruction ───────────────────────────────────────
 	const reconstruct = (ctx: ExtensionContext): void => {
-		goal = null;
 		continueScheduled = false;
-		for (const entry of ctx.sessionManager.getBranch()) {
-			if (entry.type !== "custom") continue;
-			if (entry.customType !== "goal-state") continue;
-			const d = entry.data as GoalState | undefined;
-			if (d) goal = d;
-		}
+		goal = reconstructGoalState(ctx.sessionManager.getBranch());
 		refreshStatus(ctx);
 	};
 
@@ -194,7 +203,7 @@ export default function goalModeExtension(pi: ExtensionAPI): void {
 			persist();
 			ctx.ui.notify(
 				`Goal stopped: reached ${goal.maxTurns} turn limit. ` +
-					`Use /goal clear or /goal resume with a higher budget.`,
+					`Use /goal clear, then set a new goal to continue.`,
 				"warning",
 			);
 			refreshStatus(ctx);

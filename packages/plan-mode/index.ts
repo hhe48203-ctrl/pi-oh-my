@@ -23,6 +23,31 @@ export function isPlanModeToolAllowed(toolName: string): boolean {
 	return (PLAN_MODE_TOOLS as readonly string[]).includes(toolName);
 }
 
+export function hasPersistedPlan(entries: Iterable<unknown>): boolean {
+	let latestPlan: unknown;
+	for (const entry of entries) {
+		if (!entry || typeof entry !== "object") continue;
+		const candidate = entry as {
+			type?: string;
+			customType?: string;
+			data?: unknown;
+			message?: { role?: string; toolName?: string; details?: unknown };
+		};
+		const stored =
+			candidate.type === "custom" && candidate.customType === "plan-state"
+				? candidate.data
+				: candidate.type === "message" &&
+					candidate.message?.role === "toolResult" &&
+					candidate.message.toolName === "update_plan"
+					? candidate.message.details
+					: undefined;
+		if (!stored || typeof stored !== "object") continue;
+		const planState = stored as { plan?: unknown };
+		if (Array.isArray(planState.plan)) latestPlan = planState.plan;
+	}
+	return Array.isArray(latestPlan) && latestPlan.length > 0;
+}
+
 // ── Bash command safety (from pi's plan-mode example) ──────────────
 
 const DESTRUCTIVE = [
@@ -213,18 +238,7 @@ export default function planModeExtension(pi: ExtensionAPI): void {
 	pi.on("agent_end", async (_event, ctx) => {
 		if (!planState.enabled || !ctx.hasUI) return;
 
-		// Check if there's a plan (via update_plan tool results)
-		let hasPlan = false;
-		for (const entry of ctx.sessionManager.getBranch()) {
-			if (entry.type !== "message") continue;
-			const msg = entry.message;
-			if (msg.role === "toolResult" && msg.toolName === "update_plan") {
-				const d = msg.details as { plan?: unknown[] } | undefined;
-				if (d?.plan?.length) hasPlan = true;
-			}
-		}
-
-		if (!hasPlan) return;
+		if (!hasPersistedPlan(ctx.sessionManager.getBranch())) return;
 
 		const choice = await ctx.ui.select("Plan created — what next?", [
 			"Execute the plan (restore full tools)",
