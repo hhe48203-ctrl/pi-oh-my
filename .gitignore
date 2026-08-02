@@ -6,5 +6,6 @@ coverage/
 .pi/
 .codegraph/
 *.log
+progress.md
 package-lock.json
 pnpm-lock.yaml
