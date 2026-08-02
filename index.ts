@@ -7,6 +7,7 @@ import planMode from "./packages/plan-mode/index.ts";
 import goalMode from "./packages/goal-mode/index.ts";
 import subagent from "./packages/subagent/index.ts";
 import freshCheck from "./packages/fresh-check/index.ts";
+import snapshotReview from "./packages/snapshot-review/index.ts";
 import logAnalyze from "./packages/log-analyze/index.ts";
 import { registerBuiltInToolCards } from "./packages/builtin-tools/index.ts";
 
@@ -28,6 +29,7 @@ export default function (pi: ExtensionAPI) {
 	goalMode(pi);
 	subagent(pi);
 	freshCheck(pi);
+	snapshotReview(pi);
 	logAnalyze(pi);
 	planMode(pi);
 }

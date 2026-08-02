@@ -1,4 +1,5 @@
 import type { Api, Message, Model } from "@earendil-works/pi-ai/compat";
+import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import {
   createAgentSession,
   SessionManager,
@@ -20,6 +21,7 @@ export type InProcessSubagentOptions = {
   readonly prompt: string;
   readonly tools?: string;
   readonly model?: string;
+  readonly thinkingLevel?: ThinkingLevel;
   readonly timeoutMs?: number;
   readonly currentModel: Model<Api> | undefined;
   readonly modelRegistry: ExtensionContext["modelRegistry"] | undefined;
@@ -81,6 +83,7 @@ export async function runInProcessSubagent(options: InProcessSubagentOptions): P
     cwd: options.cwd,
     model: selectedModel,
     modelRegistry: options.modelRegistry,
+    thinkingLevel: options.thinkingLevel,
     tools: parseToolList(options.tools ?? DEFAULT_TOOLS),
     excludeTools: parseToolList(EXCLUDED_CHILD_TOOLS),
     sessionManager: SessionManager.inMemory(options.cwd),

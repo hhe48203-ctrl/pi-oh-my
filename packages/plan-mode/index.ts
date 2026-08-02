@@ -16,7 +16,7 @@ import { Key } from "@earendil-works/pi-tui";
 
 // ── Tools ──────────────────────────────────────────────────────────
 
-const PLAN_MODE_TOOLS = ["read", "bash", "grep", "find", "ls", "update_plan", "get_goal"] as const;
+const PLAN_MODE_TOOLS = ["read", "bash", "grep", "find", "ls", "update_plan", "get_goal", "review_changes"] as const;
 const NORMAL_MODE_TOOLS = ["read", "bash", "edit", "write"];
 
 export function isPlanModeToolAllowed(toolName: string): boolean {

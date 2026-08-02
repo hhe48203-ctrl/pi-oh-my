@@ -1,0 +1,9 @@
+{
+  "name": "pi-oh-my-snapshot-review",
+  "version": "0.1.0",
+  "description": "Diff-scoped code review using an isolated read-only Pi session",
+  "type": "module",
+  "pi": {
+    "extensions": ["./index.ts"]
+  }
+}

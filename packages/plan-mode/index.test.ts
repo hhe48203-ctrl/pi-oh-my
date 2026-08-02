@@ -7,6 +7,7 @@ describe("plan mode tool policy", () => {
 		expect(isPlanModeToolAllowed("bash")).toBe(true);
 		expect(isPlanModeToolAllowed("update_plan")).toBe(true);
 		expect(isPlanModeToolAllowed("get_goal")).toBe(true);
+		expect(isPlanModeToolAllowed("review_changes")).toBe(true);
 	});
 
 	it("blocks write-capable and background tools", () => {
