@@ -20,7 +20,7 @@ Use ESM TypeScript with explicit `.ts` extensions for local imports. Follow the 
 
 ## Testing Guidelines
 
-Vitest discovers `packages/**/*.test.ts` in the Node environment. Place tests beside the implementation and name them `<module>.test.ts`. Add focused regression coverage for bug fixes, especially tool input validation, lifecycle behavior, and filesystem effects. Use temporary directories for file-mutating tests and clean them in `afterEach`. No coverage threshold is enforced; prioritize observable behavior and failure paths. Run `bun test` before submitting.
+Vitest discovers `packages/**/*.test.ts` in the Node environment. Place tests beside the implementation and name them `<module>.test.ts`. Add focused regression coverage for bug fixes, especially tool input validation, lifecycle behavior, and filesystem effects. Use temporary directories for file-mutating tests and clean them in `afterEach`. No coverage threshold is enforced; prioritize observable behavior and failure paths. Run `bun test` before submitting. Also run `review_changes` before integrating functional or architectural changes; skip it for documentation-only and trivial edits.
 
 ## Commit & Integration Guidelines
 

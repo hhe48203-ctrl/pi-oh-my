@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { collectReviewSnapshot, MAX_REVIEW_PATCH_CHARS, prepareReviewArguments, type GitRunner } from "./index.ts";
+import { buildReviewPrompt, collectReviewSnapshot, MAX_REVIEW_PATCH_CHARS, prepareReviewArguments, type GitRunner } from "./index.ts";
 
 let repo: string;
 let runGit: GitRunner;
@@ -81,5 +81,16 @@ describe("prepareReviewArguments", () => {
 			base: "main",
 			paths: ["src"],
 		});
+	});
+});
+
+describe("buildReviewPrompt", () => {
+	it("keeps the patch as scope while allowing read-only context inspection", () => {
+		const prompt = buildReviewPrompt({ label: "test changes", patch: "+changed", untrackedFiles: 0 });
+
+		expect(prompt).toContain("patch defines the review scope");
+		expect(prompt).toContain("Use read, grep, find, and ls");
+		expect(prompt).toContain("confirm issues in changed lines");
+		expect(prompt).toContain("+changed");
 	});
 });

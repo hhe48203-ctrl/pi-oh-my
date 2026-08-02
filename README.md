@@ -26,7 +26,7 @@ A collection of enhancements for the [Pi coding agent](https://pi.dev), inspired
 
 - **✅ Fresh Check** — Tracks whether tests/checks are newer than the latest file mutation. It understands foreground and background checks, writable subagents, and blocks Goal completion while verification is stale. `/fresh-check` shows the current state.
 
-- **🔍 Snapshot Review** — Precomputes an exact, bounded Git patch and sends only that snapshot to an isolated no-tools reviewer. `review_changes` covers uncommitted work or committed changes since a base ref; `/review-changes [base]` runs it manually.
+- **🔍 Snapshot Review** — Uses an exact, bounded Git patch as the review target while an isolated read-only reviewer inspects repository context as needed. `review_changes` covers uncommitted work or committed changes since a base ref; `/review-changes [base]` runs the same review manually.
 
 ## Installation
 
@@ -47,7 +47,7 @@ pi install ~/Desktop/pi-oh-my/packages/plan-mode           # only plan mode (nee
 pi install ~/Desktop/pi-oh-my/packages/goal-mode            # only goal mode (update-plan optional)
 pi install ~/Desktop/pi-oh-my/packages/subagent             # only subagent
 pi install ~/Desktop/pi-oh-my/packages/fresh-check           # only fresh verification tracking
-pi install ~/Desktop/pi-oh-my/packages/snapshot-review       # only diff-scoped isolated review
+pi install ~/Desktop/pi-oh-my/packages/snapshot-review       # only contextual isolated review
 pi install ~/Desktop/pi-oh-my/packages/log-analyze          # only log analysis
 ```
 
@@ -167,7 +167,7 @@ Uses Bun's SQLite driver when available, Node 22+'s built-in SQLite driver other
 
 **Fresh Check** — File edits mark verification stale; a later successful test, lint, typecheck, or build clears it. Background checks only count after `check_bg` reports completion, and a check started before a newer edit does not count. Use `/fresh-check` to inspect the state.
 
-**Snapshot Review** — Call `review_changes` without `base` to review tracked and untracked working-tree changes. Set `base` (for example, `main`) to review only commits since the merge base; unrelated working-tree edits are excluded. Large snapshots are rejected instead of silently truncated. Use `paths` to narrow the tool, or `/review-changes [base]` for the command form.
+**Snapshot Review** — Call `review_changes` without `base` to review tracked and untracked working-tree changes. Set `base` (for example, `main`) to review only commits since the merge base; unrelated working-tree edits are excluded. The reviewer may use `read`, `grep`, `find`, and `ls` to confirm changed behavior against callers, shared types, tests, configuration, and repository instructions, but findings must come from the review target. Large snapshots are rejected instead of silently truncated. Use `paths` to narrow the tool, or `/review-changes [base]` to run the same review manually. Reviews are never started automatically.
 
 Subagent/background thresholds are centralized in `packages/subagent/constants.ts` (timeout, output caps, panel limits, refresh interval, bash label preview length), so tuning behavior does not require hunting for hardcoded values across files.
 
