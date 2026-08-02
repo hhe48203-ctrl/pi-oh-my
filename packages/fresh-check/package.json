@@ -1,0 +1,9 @@
+{
+  "name": "pi-oh-my-fresh-check",
+  "version": "0.1.0",
+  "description": "Tracks whether verification is newer than the latest agent file change",
+  "type": "module",
+  "pi": {
+    "extensions": ["./index.ts"]
+  }
+}
