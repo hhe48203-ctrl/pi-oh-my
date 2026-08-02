@@ -139,7 +139,7 @@ export function registerAsyncSubagentTool(pi: ExtensionAPI): void {
     renderResult(result, options, theme) {
       return renderToolResult(theme, result, { expanded: options.expanded });
     },
-    execute: async (_id, params, _signal, _onUpdate, ctx) => {
+    execute: async (_id, params, signal, _onUpdate, ctx) => {
       try {
         const result = await runInProcessSubagent({
           cwd: ctx.cwd,
@@ -154,16 +154,21 @@ export function registerAsyncSubagentTool(pi: ExtensionAPI): void {
         if (result.timedOut) {
           return {
             content: [{ type: "text" as const, text: `Subagent timed out after ${params.timeoutMs ?? DEFAULT_TIMEOUT_MS}ms.` }],
+            details: undefined,
             isError: true,
           };
         }
         if (result.stopReason === "error" || result.stopReason === "aborted") {
-          return { content: [{ type: "text" as const, text: result.text }], isError: true };
+          return { content: [{ type: "text" as const, text: result.text }], details: undefined, isError: true };
         }
-        return { content: [{ type: "text" as const, text: result.text }] };
+        return { content: [{ type: "text" as const, text: result.text }], details: undefined };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        return { content: [{ type: "text" as const, text: `In-process subagent failed: ${message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `In-process subagent failed: ${message}` }],
+          details: undefined,
+          isError: true,
+        };
       }
     },
   });

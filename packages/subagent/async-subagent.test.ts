@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getFinalAssistantText, parseToolList, resolveModel } from "./async-subagent.ts";
+import { getFinalAssistantText, parseToolList, registerAsyncSubagentTool, resolveModel } from "./async-subagent.ts";
 
 describe("parseToolList", () => {
   it("trims comma-separated tool names", () => {
@@ -86,4 +86,24 @@ describe("resolveModel", () => {
 
     expect(resolveModel(registry, currentModel, undefined)).toBe(currentModel);
   });
+});
+
+describe("registerAsyncSubagentTool", () => {
+	it("forwards the execution signal instead of reading an undefined variable", async () => {
+		let tool: any;
+		registerAsyncSubagentTool({ registerTool(candidate: any) { tool = candidate; } } as any);
+		const signal = new AbortController().signal;
+		const result = await tool.execute("call", {
+			prompt: "test",
+			description: "test signal",
+			model: "missing-model",
+		}, signal, undefined, {
+			model: undefined,
+			modelRegistry: { getAll: () => [] },
+		});
+
+		expect(result.isError).toBe(true);
+		expect(result.content[0].text).toContain("Requested model not found: missing-model");
+		expect(result.content[0].text).not.toContain("signal is not defined");
+	});
 });
