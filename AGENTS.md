@@ -22,9 +22,9 @@ Use ESM TypeScript with explicit `.ts` extensions for local imports. Follow the 
 
 Vitest discovers `packages/**/*.test.ts` in the Node environment. Place tests beside the implementation and name them `<module>.test.ts`. Add focused regression coverage for bug fixes, especially tool input validation, lifecycle behavior, and filesystem effects. Use temporary directories for file-mutating tests and clean them in `afterEach`. No coverage threshold is enforced; prioritize observable behavior and failure paths. Run `bun test` before submitting.
 
-## Commit & Pull Request Guidelines
+## Commit & Integration Guidelines
 
-History primarily follows Conventional Commits: `fix: ...`, `feat(scope): ...`, `refactor: ...`, and `docs: ...`. Keep commits narrow and subjects imperative. Pull requests should explain the user-visible change, affected packages, and test results. Link relevant issues; include a screenshot or recording for TUI changes. Do not commit generated output, logs, coverage, `.pi/`, or `node_modules/`.
+Use Conventional Commits: `fix: ...`, `feat(scope): ...`, `refactor: ...`, and `docs: ...`. Keep one logical change per commit and write imperative subjects. After the full test suite passes, fast-forward completed work into `main` and push `main` directly. Do not commit generated output, logs, coverage, `.pi/`, `node_modules/`, or local `progress.md`.
 
 ## Development Notes
 
