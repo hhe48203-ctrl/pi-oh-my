@@ -1,0 +1,9 @@
+{
+  "name": "pi-oh-my-terminal-status-title",
+  "version": "0.1.0",
+  "description": "Shows Pi session status in the terminal title",
+  "type": "module",
+  "pi": {
+    "extensions": ["./index.ts"]
+  }
+}

@@ -9,6 +9,7 @@ import subagent from "./packages/subagent/index.ts";
 import freshCheck from "./packages/fresh-check/index.ts";
 import snapshotReview from "./packages/snapshot-review/index.ts";
 import logAnalyze from "./packages/log-analyze/index.ts";
+import terminalStatusTitle from "./packages/terminal-status-title/index.ts";
 import { registerBuiltInToolCards } from "./packages/builtin-tools/index.ts";
 
 const ALL_BUILTIN_TOOLS = ["read", "bash", "edit", "write", "find", "grep", "ls"];
@@ -31,5 +32,6 @@ export default function (pi: ExtensionAPI) {
 	freshCheck(pi);
 	snapshotReview(pi);
 	logAnalyze(pi);
+	terminalStatusTitle(pi);
 	planMode(pi);
 }

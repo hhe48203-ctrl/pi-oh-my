@@ -28,6 +28,8 @@ A collection of enhancements for the [Pi coding agent](https://pi.dev), inspired
 
 - **🔍 Snapshot Review** — Uses an exact, bounded Git patch as the review target while an isolated read-only reviewer inspects repository context as needed. `review_changes` covers uncommitted work or committed changes since a base ref; `/review-changes [base]` runs the same review manually.
 
+- **⏳ Terminal Status Title** — Shows idle, working, and completed state in the terminal title, preferring the Pi session name and falling back to the project directory.
+
 ## Installation
 
 ### Full bundle
@@ -49,6 +51,7 @@ pi install ~/Desktop/pi-oh-my/packages/subagent             # only subagent
 pi install ~/Desktop/pi-oh-my/packages/fresh-check           # only fresh verification tracking
 pi install ~/Desktop/pi-oh-my/packages/snapshot-review       # only contextual isolated review
 pi install ~/Desktop/pi-oh-my/packages/log-analyze          # only log analysis
+pi install ~/Desktop/pi-oh-my/packages/terminal-status-title # only terminal title status
 ```
 
 Restart Pi or run `/reload`.
