@@ -4,8 +4,8 @@
  * Registers an `update_plan` tool the LLM can call to maintain a
  * {step, status} checklist during multi-step work.
  *
- * States: pending → in_progress → completed
- * Constraint: at most one step in_progress at a time.
+ * States: pending → in_progress → waiting/completed
+ * Goal-bound plans require one active step unless every remaining step waits.
  *
  * State persists in tool-result details (survives branching) and in
  * a custom session entry (survives resume).
@@ -20,16 +20,62 @@ import { renderToolCall } from "../tool-render.ts";
 
 // ── Types ──────────────────────────────────────────────────────────
 
-type StepStatus = "pending" | "in_progress" | "completed";
+type StepStatus = "pending" | "in_progress" | "waiting" | "completed";
+type WaitKind = "user" | "external" | "dependency";
 
 export interface PlanItem {
 	step: string;
 	status: StepStatus;
+	waitKind?: WaitKind;
+	note?: string;
+	retryAfterSeconds?: number;
 }
 
 export interface PlanState {
 	plan: PlanItem[];
 	explanation?: string;
+	goalId?: string;
+	revision?: number;
+}
+
+export function activeGoalId(entries: Iterable<unknown>): string | undefined {
+	let goal: { id?: unknown; status?: unknown } | undefined;
+	for (const entry of entries) {
+		if (!entry || typeof entry !== "object") continue;
+		const candidate = entry as { type?: string; customType?: string; data?: unknown };
+		if (candidate.type !== "custom" || candidate.customType !== "goal-state") continue;
+		if (!candidate.data || typeof candidate.data !== "object") {
+			goal = undefined;
+			continue;
+		}
+		goal = candidate.data as { id?: unknown; status?: unknown };
+	}
+	return goal?.status === "active" && typeof goal.id === "string" ? goal.id : undefined;
+}
+
+export function validatePlan(plan: readonly PlanItem[], goalId?: string): string | undefined {
+	const inProgress = plan.filter((item) => item.status === "in_progress");
+	if (inProgress.length > 1) return `at most one step may be in_progress; got ${inProgress.length}`;
+
+	for (const item of plan) {
+		if (item.status === "waiting") {
+			if (!item.waitKind || !item.note?.trim()) {
+				return `waiting step "${item.step}" requires waitKind and note`;
+			}
+			continue;
+		}
+		if (item.waitKind || item.note || item.retryAfterSeconds !== undefined) {
+			return `step "${item.step}" may use wait fields only while waiting`;
+		}
+	}
+
+	if (!goalId) return undefined;
+	if (plan.length === 0) return "an active Goal requires a non-empty plan";
+	const unfinished = plan.filter((item) => item.status !== "completed");
+	if (unfinished.length > 0 && !unfinished.every((item) => item.status === "waiting") && inProgress.length !== 1) {
+		return "an active Goal plan requires exactly one in_progress step unless every remaining step is waiting";
+	}
+	return undefined;
 }
 
 export function reconstructPlanState(entries: Iterable<unknown>): PlanState {
@@ -66,7 +112,10 @@ const PlanItemSchema = Type.Object(
 		step: Type.String({
 			description: "One-sentence, outcome-oriented, verifiable step",
 		}),
-		status: StringEnum(["pending", "in_progress", "completed"] as const),
+		status: StringEnum(["pending", "in_progress", "waiting", "completed"] as const),
+		waitKind: Type.Optional(StringEnum(["user", "external", "dependency"] as const)),
+		note: Type.Optional(Type.String({ description: "Concrete reason this step is waiting" })),
+		retryAfterSeconds: Type.Optional(Type.Number({ minimum: 5, maximum: 86400 })),
 	},
 	{ additionalProperties: false },
 );
@@ -117,13 +166,13 @@ export default function updatePlanExtension(pi: ExtensionAPI): void {
 			"Track progress on multi-step tasks (3+ steps). " +
 			"Call this BEFORE starting work to lay out steps, then update as you complete each step. " +
 			"Replace the full plan each call. Keep exactly one step in_progress; mark completed steps done. " +
-			"Skip for simple single-step tasks.",
+			"Waiting steps must name their wait kind and reason. For an active Goal, update_plan is required.",
 		promptSnippet: "update_plan: lay out and track multi-step task checklists (call before starting work on 3+ step tasks)",
 		promptGuidelines: [
 			"Call update_plan before starting non-trivial multi-step work to lay out the steps.",
 			"Update the plan after completing each step — mark it completed and move the next to in_progress.",
 			"Keep exactly one step in_progress at a time.",
-			"Skip update_plan for simple single-step tasks.",
+			"Outside Goal Mode, skip update_plan for simple single-step tasks.",
 		],
 		parameters: UpdatePlanParams,
 		renderCall(args, theme) {
@@ -131,15 +180,14 @@ export default function updatePlanExtension(pi: ExtensionAPI): void {
 		},
 
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-			// Validate: at most one in_progress
-			const inProgress = params.plan.filter((p) => p.status === "in_progress");
-			if (inProgress.length > 1) {
+			const goalId = activeGoalId(ctx.sessionManager.getBranch());
+			const error = validatePlan(params.plan, goalId);
+			if (error) {
 				return {
 					content: [
 						{
 							type: "text" as const,
-							text: "Error: at most one step may be in_progress. " +
-								`Got ${inProgress.length}. Fix and retry.`,
+							text: `Error: ${error}. Fix and retry.`,
 						},
 					],
 					details: state,
@@ -147,9 +195,19 @@ export default function updatePlanExtension(pi: ExtensionAPI): void {
 				};
 			}
 
+			const samePlan = state.goalId === goalId && JSON.stringify(state.plan) === JSON.stringify(params.plan);
+			if (samePlan) {
+				return {
+					content: [{ type: "text" as const, text: "Plan unchanged; make concrete progress before updating it again." }],
+					details: state,
+				};
+			}
+
 			state = {
 				plan: params.plan,
 				explanation: params.explanation,
+				...(goalId ? { goalId } : {}),
+				revision: state.goalId === goalId ? (state.revision ?? 0) + 1 : 1,
 			};
 
 			// Persist as custom entry (doesn't enter LLM context)
@@ -194,6 +252,9 @@ export default function updatePlanExtension(pi: ExtensionAPI): void {
 				} else if (item.status === "in_progress") {
 					mark = theme.fg("warning", "▶");
 					text = theme.bold(item.step);
+				} else if (item.status === "waiting") {
+					mark = theme.fg("warning", "⏳");
+					text = `${item.step} — ${item.note}`;
 				} else {
 					mark = theme.fg("dim", "○");
 					text = theme.fg("dim", item.step);
@@ -238,7 +299,7 @@ export default function updatePlanExtension(pi: ExtensionAPI): void {
 			const text = state.plan
 				.map((p) => {
 					const m =
-						p.status === "completed" ? "✓" : p.status === "in_progress" ? "▶" : "○";
+						p.status === "completed" ? "✓" : p.status === "in_progress" ? "▶" : p.status === "waiting" ? "⏳" : "○";
 					return `${m} ${p.step}`;
 				})
 				.join("\n");

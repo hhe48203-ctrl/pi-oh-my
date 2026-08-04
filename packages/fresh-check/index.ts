@@ -29,7 +29,8 @@ export function createFreshCheckState(): FreshCheckState {
 
 // ponytail: command-name heuristic; replace with project-configured checks if false positives become common.
 export function isVerificationCommand(command: string): boolean {
-	return /(?:^|[;&|]\s*)(?:(?:bun|npm|pnpm|yarn|deno)\s+(?:run\s+)?(?:test|check|lint|build|typecheck)|(?:cargo|go)\s+(?:test|check)|pytest|python\s+-m\s+pytest|vitest|tsc|eslint|ruff|mypy|make\s+(?:test|check|lint|build))(?:\s|$)/i.test(command);
+	return /(?:^|[;&|]\s*)(?:(?:bun|npm|pnpm|yarn|deno)\s+(?:run\s+)?(?:test|check|lint|build|typecheck)(?::[\w.-]+)?|(?:cargo|go)\s+(?:test|check)|pytest|python\s+-m\s+pytest|vitest|tsc|eslint|ruff|mypy|make\s+(?:test|check|lint|build))(?:\s|$)/i.test(command) ||
+		/(?:^|[;&|]\s*)bun\s+(?:run\s+)?(?:\S+\/)?(?:test[-_.]\S+|\S+\.(?:test|spec)\.\S+)(?:\s|$)/i.test(command);
 }
 
 function writableSubagent(input: Record<string, unknown>): boolean {

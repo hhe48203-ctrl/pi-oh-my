@@ -5,7 +5,11 @@ describe("fresh-check", () => {
 	it("recognizes checks without treating installs as verification", () => {
 		expect(isVerificationCommand("bun test")).toBe(true);
 		expect(isVerificationCommand("npm run lint && tsc --noEmit")).toBe(true);
+		expect(isVerificationCommand("bun run test:offline")).toBe(true);
+		expect(isVerificationCommand("bun run src/test-roles.ts && bun run src/test-bridge-gateway.ts")).toBe(true);
+		expect(isVerificationCommand("bun run src/config.test.ts")).toBe(true);
 		expect(isVerificationCommand("bun install")).toBe(false);
+		expect(isVerificationCommand("bun run src/build-fixtures.ts")).toBe(false);
 	});
 
 	it("requires a successful check after the latest change", () => {

@@ -3,15 +3,17 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { Type } from "typebox";
 
 import { renderToolCall, renderToolResult } from "../tool-render.ts";
-import type { GoalState, GoalUpdateStatus } from "./state.ts";
+import type { GoalPlanView, GoalState, GoalUpdateStatus } from "./state.ts";
 
 interface GoalUpdateResult {
 	message: string;
 	goal: GoalState;
+	isError?: boolean;
 }
 
 interface GoalToolRuntime {
 	getGoal(): GoalState | null;
+	getPlan(ctx: ExtensionContext): GoalPlanView | null;
 	updateGoal(status: GoalUpdateStatus, reason: string | undefined, ctx: ExtensionContext): GoalUpdateResult | null;
 }
 
@@ -30,8 +32,7 @@ export function registerGoalTools(pi: ExtensionAPI, runtime: GoalToolRuntime): v
 		name: "get_goal",
 		label: "Goal",
 		description:
-			"Read the current active goal, its status, and remaining turn budget. " +
-			"Use this to remind yourself of the objective and how many turns you have left.",
+			"Read the current Goal, its linked Plan frontier, accumulated usage, and continuation state.",
 		parameters: GetGoalParams,
 		renderCall(_args, theme) {
 			return renderToolCall(theme, "get_goal");
@@ -40,23 +41,27 @@ export function registerGoalTools(pi: ExtensionAPI, runtime: GoalToolRuntime): v
 			return renderToolResult(theme, result, { expanded: options.expanded });
 		},
 
-		async execute() {
+		async execute(_id, _params, _signal, _onUpdate, ctx) {
 			const goal = runtime.getGoal();
+			const plan = runtime.getPlan(ctx);
 			if (!goal) {
 				return {
 					content: [{ type: "text" as const, text: "No active goal." }],
 					details: null,
 				};
 			}
-			const remaining = goal.maxTurns - goal.turnsUsed;
 			const text =
 				`Goal: ${goal.objective}\n` +
 				`Status: ${goal.status}\n` +
-				`Turns: ${goal.turnsUsed}/${goal.maxTurns} (${remaining} remaining)\n` +
-				`Tokens: ~${goal.tokensUsed}`;
+				`Turns: ${goal.turnsUsed} (no hard limit)\n` +
+				`Tokens: ${goal.tokensUsed}\n` +
+				`Cost: $${goal.costUsed.toFixed(4)}\n` +
+				`Plan: ${plan ? `${plan.phase}, ${plan.done}/${plan.total}, revision ${plan.revision}` : "unavailable"}` +
+				(plan?.current ? `\nCurrent step: ${plan.current}` : "") +
+				(goal.blocker ? `\nWaiting for user: ${goal.blocker}` : "");
 			return {
 				content: [{ type: "text" as const, text }],
-				details: goal,
+				details: { goal, plan },
 			};
 		},
 	});
@@ -65,15 +70,13 @@ export function registerGoalTools(pi: ExtensionAPI, runtime: GoalToolRuntime): v
 		name: "update_goal",
 		label: "Update Goal",
 		description:
-			"Mark the active goal as complete or blocked. " +
-			"Use 'complete' ONLY when you have verified the objective is met " +
-			"(tests pass, files exist, etc). " +
-			"Use 'blocked' when you cannot proceed and need user help. " +
+			"Mark the active Goal complete after every linked Plan step is completed, " +
+			"or blocked only after every unfinished Plan step is waiting for user input. " +
 			"You CANNOT pause, resume, or clear — those are user-controlled.",
 		promptSnippet: "update_goal: mark the goal complete or blocked",
 		promptGuidelines: [
-			"Call update_goal(complete) when the objective is verifiably met",
-			"Call update_goal(blocked) when you cannot proceed",
+			"Call update_goal(complete) only after the linked Plan is complete and required verification passes.",
+			"Before update_goal(blocked), mark every unfinished Plan step waiting with waitKind=user and a concrete note.",
 		],
 		parameters: UpdateGoalParams,
 		renderCall(args, theme) {
@@ -92,10 +95,11 @@ export function registerGoalTools(pi: ExtensionAPI, runtime: GoalToolRuntime): v
 				};
 			}
 
-			ctx.ui.notify(result.message, params.status === "complete" ? "info" : "warning");
+			if (!result.isError) ctx.ui.notify(result.message, params.status === "complete" ? "info" : "warning");
 			return {
 				content: [{ type: "text" as const, text: result.message }],
 				details: result.goal,
+				...(result.isError ? { isError: true } : { terminate: true }),
 			};
 		},
 	});
